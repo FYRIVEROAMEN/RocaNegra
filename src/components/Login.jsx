@@ -22,11 +22,11 @@ function Login({ onLogin }) {
         <div className="text-center mb-6">
           {/* 👇 Acá cambiamos el ícono por la imagen */}
           <img 
-            src="/bulldog.png" 
-            alt="Logo Stock LOLO" 
+            src="/Moon.png" 
+            alt="Logo Stock " 
             className="w-24 h-24 mx-auto mb-3 object-contain"
           />
-          <h1 className="text-3xl font-bold text-gray-800">Stock LOLO</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Moon Importados</h1>
           <p className="text-gray-500 mt-1">Sistema de gestión de stock</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

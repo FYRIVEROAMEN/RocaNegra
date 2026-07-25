@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Download, Trash2, Calendar, Filter, Eye, X } from 'lucide-react'
-import { getVentas, deleteDetalleVenta, deleteVenta } from '../services/api'
-import { createClient } from '@supabase/supabase-js'
+import { getVentas, deleteVenta } from '../services/api'
 import Swal from 'sweetalert2'
-
-
-// Cliente de Supabase para consultas directas con join
-const supabase = createClient(
-  'https://izxtbndkcjxubvnisygh.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6eHRibmRrY2p4dWJ2bmlzeWdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NTA3NDksImV4cCI6MjEwMDIyNjc0OX0.d-lkbzrINaZMFTRd4Yf34VHiNKcJgNUex9amF0gHknc'
-)
 
 function SalesHistory() {
   const [ventas, setVentas] = useState([])
@@ -25,44 +17,26 @@ function SalesHistory() {
   const fetchVentas = async () => {
     setLoading(true)
     try {
-      // 1. Obtener todas las ventas
-      const { data: ventasData, error: ventasError } = await supabase
-        .from('ventas')
-        .select('*')
-        .order('fecha', { ascending: false })
+      // ✅ Usamos la función de api.js que YA filtra por local_id y hace el join
+      const response = await getVentas()
+      const ventasData = response.data || []
       
-      if (ventasError) throw new Error(ventasError.message)
+      // Adaptamos la estructura para que coincida con lo que espera el componente 
+      // (la API devuelve 'detalle_ventas', el componente espera 'detalle')
+      const ventasAdaptadas = ventasData.map(venta => ({
+        ...venta,
+        detalle: venta.detalle_ventas || []
+      }))
       
-      // 2. Para cada venta, obtener su detalle con join a productos
-      const ventasConDetalle = await Promise.all(
-        (ventasData || []).map(async (venta) => {
-          const { data: detalle, error: detalleError } = await supabase
-            .from('detalle_ventas')
-            .select(`
-              id,
-              cantidad,
-              precio_unitario,
-              producto_id,
-              productos!producto_id (
-                nombre,
-                talle,
-                color
-              )
-            `)
-            .eq('venta_id', venta.id)
-          
-          if (detalleError) {
-            console.error('Error cargando detalle:', detalleError)
-            return { ...venta, detalle: [] }
-          }
-          
-          return { ...venta, detalle: detalle || [] }
-        })
-      )
-      
-      setVentas(ventasConDetalle)
+      setVentas(ventasAdaptadas)
     } catch (err) {
       console.error('Error al cargar ventas:', err)
+      Swal.fire({
+        title: 'Error',
+        text: 'No se pudieron cargar las ventas',
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      })
     }
     setLoading(false)
   }
@@ -78,7 +52,6 @@ function SalesHistory() {
     return true
   })
 
-  // ✅ CSV CORREGIDO: cada campo entre comillas para evitar roturas
   const exportToCSV = () => {
     const headers = ['ID Venta', 'Fecha', 'Producto', 'Talle', 'Color', 'Cantidad', 'Precio Unitario', 'Subtotal']
     const rows = []
@@ -121,7 +94,6 @@ function SalesHistory() {
       }
     })
 
-    // ✅ Cada fila envuelta en comillas dobles para evitar problemas con comas
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
@@ -159,7 +131,7 @@ function SalesHistory() {
       })
 
       for (const venta of ventasAEliminar) {
-        await deleteDetalleVenta(venta.id)
+        // Al borrar la venta, la base de datos borra en cascada los detalles
         await deleteVenta(venta.id)
       }
 
@@ -199,7 +171,6 @@ function SalesHistory() {
     if (!result.isConfirmed) return
 
     try {
-      await deleteDetalleVenta(id)
       await deleteVenta(id)
       await fetchVentas()
       
@@ -291,7 +262,6 @@ function SalesHistory() {
                       minute: '2-digit'
                     })}
                   </p>
-                  {/* ✅ Mostrar cantidad de productos */}
                   <p className="text-sm text-gray-500 mt-1">
                     {venta.detalle?.length || 0} producto(s)
                   </p>
@@ -353,7 +323,6 @@ function SalesHistory() {
             {selectedVenta.detalle?.length === 0 ? (
               <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl">
                 <p>No hay productos registrados en esta venta.</p>
-                <p className="text-sm mt-2">Puede que los detalles se hayan eliminado.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -404,7 +373,7 @@ function SalesHistory() {
           <p className="text-yellow-900 font-bold text-lg mt-1">FacundoRivero11</p>
         </div>
         <p className="text-gray-300 text-xs mt-4">
-          © {new Date().getFullYear()} Stock Mercaderia
+          © {new Date().getFullYear()} Sistema de Gestión
         </p>
       </div>
     </div>
