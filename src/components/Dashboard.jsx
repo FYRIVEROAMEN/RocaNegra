@@ -17,10 +17,9 @@ function Dashboard({ onLogout }) {
   const [showInactive, setShowInactive] = useState(false)
   const [productosInactivos, setProductosInactivos] = useState([])
   const [showTutorial, setShowTutorial] = useState(false)
-  const [addedToCart, setAddedToCart] = useState(null) // ID del producto recién agregado
-  
-  // 👇 CARRITO PERSISTENTE (vive en el Dashboard)
+  const [addedToCart, setAddedToCart] = useState(null)
   const [cart, setCart] = useState([])
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false)
 
   const fetchProductos = useCallback(async () => {
     setLoading(true)
@@ -71,50 +70,44 @@ function Dashboard({ onLogout }) {
     }
   }
 
-  
-  // 👇 FUNCIÓN PARA AGREGAR AL CARRITO (desde cualquier parte)
-const addToCartFromDashboard = (product) => {
-  setCart(prevCart => {
-    const existingItem = prevCart.find(item => item.id === product.id)
-    let newCart
-    
-    if (existingItem) {
-      if (existingItem.quantity + 1 > product.stock) {
-        Swal.fire({
-          title: 'Stock insuficiente',
-          text: `Solo quedan ${product.stock} unidades de ${product.nombre}.`,
-          icon: 'warning',
-          confirmButtonColor: '#dc2626',
-          timer: 2000,
-          showConfirmButton: false
-        })
-        return prevCart
+  const addToCartFromDashboard = (product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id)
+      let newCart
+      
+      if (existingItem) {
+        if (existingItem.quantity + 1 > product.stock) {
+          Swal.fire({
+            title: 'Stock insuficiente',
+            text: `Solo quedan ${product.stock} unidades de ${product.nombre}.`,
+            icon: 'warning',
+            confirmButtonColor: '#dc2626',
+            timer: 2000,
+            showConfirmButton: false
+          })
+          return prevCart
+        }
+        newCart = prevCart.map(item => 
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        )
+      } else {
+        newCart = [...prevCart, { ...product, quantity: 1 }]
       }
-      newCart = prevCart.map(item => 
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      )
-    } else {
-      newCart = [...prevCart, { ...product, quantity: 1 }]
-    }
-    
-    // 👇 Feedback visual: mostrar notificación
-    Swal.fire({
-      title: '¡Agregado al carrito!',
-      text: `${product.nombre} (${newCart.reduce((sum, item) => item.id === product.id ? item.quantity : sum, 0)} en total)`,
-      icon: 'success',
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true
+      
+      Swal.fire({
+        title: '¡Agregado al carrito!',
+        text: `${product.nombre} (${newCart.reduce((sum, item) => item.id === product.id ? item.quantity : sum, 0)} en total)`,
+        icon: 'success',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true
+      })
+      
+      return newCart
     })
-    
-    return newCart
-  })
-  
-  // 👇 ELIMINAMOS: setCurrentView('sales')
-  // El usuario se queda en Inventario para seguir seleccionando
-}
+  }
 
   const filteredProductos = productos.filter(p =>
     p.nombre?.toLowerCase().includes(search.toLowerCase()) ||
@@ -140,7 +133,6 @@ const addToCartFromDashboard = (product) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Navegación Desktop */}
         <div className="top-tabs">
           <button onClick={() => setCurrentView('dashboard')} className={`tab-btn ${currentView === 'dashboard' ? 'active' : ''}`}>
             <Package className="w-6 h-6" /> Inventario
@@ -158,46 +150,54 @@ const addToCartFromDashboard = (product) => {
 
         {currentView === 'dashboard' ? (
           <>
-            {/* Stats: carrusel horizontal en mobile, grid en desktop */}
-            <div className="mb-6">
-              <div className="sm:hidden flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
-                <div className="snap-center shrink-0 w-[70%] bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-2xl border border-indigo-200">
-                  <p className="text-sm text-indigo-700 font-medium">Total Items</p>
-                  <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
-                </div>
-                <div className="snap-center shrink-0 w-[70%] bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
-                  <p className="text-sm text-blue-700 font-medium">Stock Total</p>
-                  <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
-                </div>
-                <div className={`snap-center shrink-0 w-[70%] p-4 rounded-2xl border ${
-                  stockBajo > 0 
-                    ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
-                    : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
-                }`}>
-                  <p className={`text-sm font-medium flex items-center gap-1 ${
-                    stockBajo > 0 ? 'text-red-700' : 'text-green-700'
-                  }`}>
-                    <AlertTriangle className="w-4 h-4" /> Stock Bajo
-                  </p>
-                  <p className={`text-3xl font-bold mt-1 ${
-                    stockBajo > 0 ? 'text-red-600' : 'text-green-600'
-                  }`}>{stockBajo}</p>
-                  
-                  {stockBajo > 0 && (
-                    <div className="mt-2 pt-2 border-t border-red-200">
-                      {productos
-                        .filter(p => p.stock <= 5 && p.stock > 0)
-                        .slice(0, 3)
-                        .map(p => (
-                          <div key={p.id} className="text-xs text-red-700 truncate">
-                            • {p.nombre}: <strong>{p.stock}</strong>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {/* ==========================================
+    STATS: Carrusel auto-scroll (mobile) / Grid (desktop)
+    ========================================== */}
+<div className="mb-6">
+  {/* MOBILE - Carrusel Auto-Scroll Infinito */}
+  <div 
+    className="sm:hidden auto-scroll-container"
+    onMouseEnter={() => setIsCarouselPaused(true)}
+    onMouseLeave={() => setIsCarouselPaused(false)}
+    onTouchStart={() => setIsCarouselPaused(true)}
+    onTouchEnd={() => setIsCarouselPaused(false)}
+  >
+    <div className={`auto-scroll-track ${isCarouselPaused ? 'paused' : ''}`}>
+      {/* PRIMERA VUELTA */}
+      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-2xl border border-indigo-200">
+        <p className="text-sm text-indigo-700 font-medium">Total Items</p>
+        <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
+      </div>
+      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
+        <p className="text-sm text-blue-700 font-medium">Stock Total</p>
+        <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
+      </div>
+      <div className={`shrink-0 w-[70vw] p-4 rounded-2xl border ${stockBajo > 0 ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'}`}>
+        <p className={`text-sm font-medium flex items-center gap-1 ${stockBajo > 0 ? 'text-red-700' : 'text-green-700'}`}>
+          <AlertTriangle className="w-4 h-4" /> Stock Bajo
+        </p>
+        <p className={`text-3xl font-bold mt-1 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
+      </div>
+      
+      {/* SEGUNDA VUELTA (Duplicado exacto para el loop infinito) */}
+      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-2xl border border-indigo-200">
+        <p className="text-sm text-indigo-700 font-medium">Total Items</p>
+        <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
+      </div>
+      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
+        <p className="text-sm text-blue-700 font-medium">Stock Total</p>
+        <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
+      </div>
+      <div className={`shrink-0 w-[70vw] p-4 rounded-2xl border ${stockBajo > 0 ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'}`}>
+        <p className={`text-sm font-medium flex items-center gap-1 ${stockBajo > 0 ? 'text-red-700' : 'text-green-700'}`}>
+          <AlertTriangle className="w-4 h-4" /> Stock Bajo
+        </p>
+        <p className={`text-3xl font-bold mt-1 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
+      </div>
+    </div>
+  </div>
 
+              {/* DESKTOP - Grid estático */}
               <div className="hidden sm:grid sm:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                   <p className="text-lg text-gray-600 font-medium">Total Productos</p>
@@ -212,36 +212,14 @@ const addToCartFromDashboard = (product) => {
                     <AlertTriangle className="w-6 h-6 text-red-500" /> Stock Bajo (≤5)
                   </p>
                   <p className={`text-4xl font-bold mt-2 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
-                  
-                  {stockBajo > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-sm font-semibold text-gray-700 mb-2">Productos en riesgo:</p>
-                      <div className="space-y-1 max-h-24 overflow-y-auto">
-                        {productos
-                          .filter(p => p.stock <= 5 && p.stock > 0)
-                          .map(p => (
-                            <div key={p.id} className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600 truncate">{p.nombre}</span>
-                              <span className={`font-bold ${p.stock <= 2 ? 'text-red-600' : 'text-orange-600'}`}>
-                                {p.stock} {p.stock === 1 ? 'unidad' : 'unidades'}
-                              </span>
-                            </div>
-                          ))}
-                        {productos.filter(p => p.stock === 0).length > 0 && (
-                          <div className="text-sm text-red-600 font-bold mt-2">
-                            ⚠️ {productos.filter(p => p.stock === 0).length} producto(s) agotado(s)
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
 
+            {/* BARRA DE BÚSQUEDA Y BOTÓN AGREGAR */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div className="relative flex-1 max-w-md w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" id="search-input" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Buscar por nombre, categoría o color..."
@@ -253,13 +231,12 @@ const addToCartFromDashboard = (product) => {
               <button
                 onClick={() => { setShowForm(true); setEditId(null); }}
                 className="btn btn-primary w-full sm:w-auto"
-                id="add-product-btn"
               >
                 <Plus className="w-6 h-6" /> Agregar Producto
               </button>
             </div>
 
-            {/* VISTA MOBILE: Cards con IMAGEN y botón VENDER */}
+            {/* VISTA MOBILE: Cards con IMAGEN */}
             <div className="product-cards-mobile">
               {loading ? <div className="loading-state">Cargando productos...</div> : 
                 filteredProductos.length === 0 ? (
@@ -269,27 +246,19 @@ const addToCartFromDashboard = (product) => {
                     <div key={p.id} className="product-card">
                       {p.imagen_url ? (
                         <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', background: '#f3f4f6' }}>
-                          <img 
-                            src={p.imagen_url} 
-                            alt={p.nombre}
-                            style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }}
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
+                          <img src={p.imagen_url} alt={p.nombre} style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} onError={(e) => { e.target.style.display = 'none'; }} />
                         </div>
                       ) : (
                         <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', background: '#f3f4f6', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
                           <Package className="w-12 h-12" />
                         </div>
                       )}
-
                       <div className="product-card-header">
                         <div>
                           <h3 className="product-card-title">{p.nombre}</h3>
                           <p className="product-card-meta">{p.categoria || 'Sin categoría'}</p>
                         </div>
-                        <span className={`stock-badge ${p.stock <= 5 ? 'stock-low' : 'stock-ok'}`}>
-                          Stock: {p.stock}
-                        </span>
+                        <span className={`stock-badge ${p.stock <= 5 ? 'stock-low' : 'stock-ok'}`}>Stock: {p.stock}</span>
                       </div>
                       <div className="product-card-details">
                         <div className="detail-item">Talle: <span>{p.talle || '-'}</span></div>
@@ -298,23 +267,8 @@ const addToCartFromDashboard = (product) => {
                       <div className="product-card-footer">
                         <div className="product-price">${Number(p.precio).toFixed(2)}</div>
                         <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '8px' }}>
-                          {/* 👇 Botón Vender Rápido - Ahora agrega al carrito persistente */}
-                          <button 
-                            onClick={() => {
-                              addToCartFromDashboard(p)
-                              setAddedToCart(p.id)
-                              setTimeout(() => setAddedToCart(null), 2000) // Mostrar por 2 segundos
-                            }} 
-                            className="btn btn-success touch-target" 
-                            style={{ 
-                              flex: 1,
-                              position: 'relative',
-                              background: addedToCart === p.id ? '#16a34a' : '#22c55e'
-                            }}
-                            disabled={p.stock <= 0}
-                          >
-                            <ShoppingCart size={18} /> 
-                            {addedToCart === p.id ? '✓ Agregado' : 'Vender'}
+                          <button onClick={() => { addToCartFromDashboard(p); setAddedToCart(p.id); setTimeout(() => setAddedToCart(null), 2000); }} className="btn btn-success touch-target" style={{ flex: 1, position: 'relative', background: addedToCart === p.id ? '#16a34a' : '#22c55e' }} disabled={p.stock <= 0}>
+                            <ShoppingCart size={18} /> {addedToCart === p.id ? '✓ Agregado' : 'Vender'}
                           </button>
                           <button onClick={() => { setShowForm(true); setEditId(p.id); }} className="btn btn-secondary touch-target" style={{ flex: 1 }}>
                             <Edit2 size={18} /> Editar
@@ -348,12 +302,7 @@ const addToCartFromDashboard = (product) => {
                         <tr key={p.id} className="hover:bg-blue-50 transition">
                           <td className="px-6 py-4">
                             {p.imagen_url ? (
-                              <img 
-                                src={p.imagen_url} 
-                                alt={p.nombre}
-                                style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '8px' }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
+                              <img src={p.imagen_url} alt={p.nombre} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => { e.target.style.display = 'none'; }} />
                             ) : (
                               <div style={{ width: '50px', height: '50px', background: '#f3f4f6', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Package className="w-6 h-6 text-gray-400" />
@@ -370,33 +319,13 @@ const addToCartFromDashboard = (product) => {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 justify-end">
-                              {/* 👇 Botón Vender (solo desktop) */}
-                              <button 
-                                onClick={() => {
-                                  addToCartFromDashboard(p)
-                                  setAddedToCart(p.id)
-                                  setTimeout(() => setAddedToCart(null), 2000)
-                                }} 
-                                className="btn btn-success touch-target"
-                                disabled={p.stock <= 0}
-                                title="Agregar al carrito"
-                              >
+                              <button onClick={() => { addToCartFromDashboard(p); setAddedToCart(p.id); setTimeout(() => setAddedToCart(null), 2000); }} className="btn btn-success touch-target" disabled={p.stock <= 0} title="Agregar al carrito">
                                 <ShoppingCart className="w-4 h-4" />
                               </button>
-                              
-                              <button 
-                                onClick={() => { setShowForm(true); setEditId(p.id); }} 
-                                className="btn btn-secondary touch-target"
-                                title="Editar producto"
-                              >
+                              <button onClick={() => { setShowForm(true); setEditId(p.id); }} className="btn btn-secondary touch-target" title="Editar producto">
                                 <Edit2 className="w-5 h-5" />
                               </button>
-                              
-                              <button 
-                                onClick={() => handleDelete(p.id)} 
-                                className="btn btn-danger touch-target"
-                                title="Eliminar producto"
-                              >
+                              <button onClick={() => handleDelete(p.id)} className="btn btn-danger touch-target" title="Eliminar producto">
                                 <Trash2 className="w-5 h-5" />
                               </button>
                             </div>
@@ -451,13 +380,7 @@ const addToCartFromDashboard = (product) => {
             )}
           </>
         ) : currentView === 'sales' ? (
-          // 👇 Pasamos el carrito y la función para limpiarlo
-          <SalesForm 
-            onSaleRecorded={fetchProductos} 
-            productos={productos}
-            cart={cart}
-            setCart={setCart}
-          />
+          <SalesForm onSaleRecorded={fetchProductos} productos={productos} cart={cart} setCart={setCart} />
         ) : (
           <SalesHistory />
         )}

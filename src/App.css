@@ -261,3 +261,46 @@ body {
 }
 .mobile-view-title h2 { margin: 0; font-size: 20px; font-weight: 700; }
 @media (min-width: 768px) { .mobile-view-title { display: none; } }
+
+/* ============================================
+   CARRUSEL AUTO-SCROLL (solo mobile)
+   ============================================ */
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.auto-scroll-container {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  width: 100%;
+  touch-action: pan-y; /* Permite scroll vertical pero no horizontal */
+}
+
+@media (min-width: 640px) {
+  .auto-scroll-container {
+    display: none !important;
+  }
+}
+
+.auto-scroll-track {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: scroll-left 35s linear infinite;
+}
+
+/* Pausar con clase de JavaScript */
+.auto-scroll-track.paused {
+  animation-play-state: paused !important;
+}
+
+/* Hover para desktop/tablet con mouse */
+.auto-scroll-container:hover .auto-scroll-track {
+  animation-play-state: paused !important;
+}
