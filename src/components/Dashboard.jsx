@@ -119,12 +119,17 @@ function Dashboard({ onLogout }) {
   const totalProductos = productos.length
   const totalStock = productos.reduce((acc, p) => acc + (p.stock || 0), 0)
 
+  const productosEnRiesgo = productos
+    .filter(p => p.stock <= 5)
+    .sort((a, b) => a.stock - b.stock)
+
   return (
     <div className="min-h-screen pb-32 md:pb-8">
+      {/* HEADER COMPACTO */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Package className="w-7 h-7 md:w-8 md:h-8 text-blue-600" /> Stock Mercadería
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <h1 className="text-lg md:text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <Package className="w-6 h-6 md:w-8 md:h-8 text-blue-600" /> Stock Mercadería
           </h1>
           <button onClick={onLogout} className="btn btn-secondary touch-target">
             <LogOut className="w-5 h-5" /> <span className="hidden sm:inline">Salir</span>
@@ -151,51 +156,127 @@ function Dashboard({ onLogout }) {
         {currentView === 'dashboard' ? (
           <>
             {/* ==========================================
-    STATS: Carrusel auto-scroll (mobile) / Grid (desktop)
-    ========================================== */}
-<div className="mb-6">
-  {/* MOBILE - Carrusel Auto-Scroll Infinito */}
-  <div 
-    className="sm:hidden auto-scroll-container"
-    onMouseEnter={() => setIsCarouselPaused(true)}
-    onMouseLeave={() => setIsCarouselPaused(false)}
-    onTouchStart={() => setIsCarouselPaused(true)}
-    onTouchEnd={() => setIsCarouselPaused(false)}
-  >
-    <div className={`auto-scroll-track ${isCarouselPaused ? 'paused' : ''}`}>
-      {/* PRIMERA VUELTA */}
-      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-2xl border border-indigo-200">
-        <p className="text-sm text-indigo-700 font-medium">Total Items</p>
-        <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
-      </div>
-      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
-        <p className="text-sm text-blue-700 font-medium">Stock Total</p>
-        <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
-      </div>
-      <div className={`shrink-0 w-[70vw] p-4 rounded-2xl border ${stockBajo > 0 ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'}`}>
-        <p className={`text-sm font-medium flex items-center gap-1 ${stockBajo > 0 ? 'text-red-700' : 'text-green-700'}`}>
-          <AlertTriangle className="w-4 h-4" /> Stock Bajo
-        </p>
-        <p className={`text-3xl font-bold mt-1 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
-      </div>
-      
-      {/* SEGUNDA VUELTA (Duplicado exacto para el loop infinito) */}
-      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-2xl border border-indigo-200">
-        <p className="text-sm text-indigo-700 font-medium">Total Items</p>
-        <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
-      </div>
-      <div className="shrink-0 w-[70vw] bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
-        <p className="text-sm text-blue-700 font-medium">Stock Total</p>
-        <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
-      </div>
-      <div className={`shrink-0 w-[70vw] p-4 rounded-2xl border ${stockBajo > 0 ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'}`}>
-        <p className={`text-sm font-medium flex items-center gap-1 ${stockBajo > 0 ? 'text-red-700' : 'text-green-700'}`}>
-          <AlertTriangle className="w-4 h-4" /> Stock Bajo
-        </p>
-        <p className={`text-3xl font-bold mt-1 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
-      </div>
-    </div>
-  </div>
+                STATS: Cards compactas (mobile) / Grid (desktop)
+                ========================================== */}
+            <div className="mb-6">
+              {/* MOBILE - Carrusel con Cards Compactas */}
+              <div 
+                className="sm:hidden auto-scroll-container"
+                onMouseEnter={() => setIsCarouselPaused(true)}
+                onMouseLeave={() => setIsCarouselPaused(false)}
+                onTouchStart={() => setIsCarouselPaused(true)}
+                onTouchEnd={() => setIsCarouselPaused(false)}
+              >
+                <div className={`auto-scroll-track ${isCarouselPaused ? 'paused' : ''}`}>
+                  {/* PRIMERA VUELTA */}
+                  
+                  {/* Card 1: Total Items */}
+                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs text-indigo-700 font-medium">Total Items</p>
+                      <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
+                    </div>
+                    <p className="text-[10px] text-indigo-600">productos activos</p>
+                  </div>
+
+                  {/* Card 2: Stock Total */}
+                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Stock Total</p>
+                      <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
+                    </div>
+                    <p className="text-[10px] text-blue-600">unidades en inventario</p>
+                  </div>
+
+                  {/* Card 3: Alertas de Stock */}
+                  <div className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col ${
+                    stockBajo > 0 
+                      ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
+                      : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                  }`}>
+                    <p className={`text-xs font-bold flex items-center gap-1 ${
+                      stockBajo > 0 ? 'text-red-700' : 'text-green-700'
+                    }`}>
+                      <AlertTriangle className="w-3 h-3" /> Alertas de Stock
+                      {stockBajo > 0 && <span className="ml-1">({stockBajo})</span>}
+                    </p>
+                    
+                    {stockBajo > 0 ? (
+                      <div className="mt-2 flex-1 overflow-y-auto space-y-1 pr-1">
+                        {productosEnRiesgo.slice(0, 5).map(p => (
+                          <div key={p.id} className="flex justify-between items-center text-[10px] leading-tight">
+                            <span className="truncate flex-1 text-red-800 font-medium">{p.nombre}</span>
+                            <span className="font-bold text-red-600 ml-1 text-[9px] whitespace-nowrap">
+                              {p.stock}{p.stock === 1 ? 'ud' : 'uds'}
+                            </span>
+                          </div>
+                        ))}
+                        {productosEnRiesgo.length > 5 && (
+                          <p className="text-red-600 text-[9px] font-semibold text-center mt-1">
+                            +{productosEnRiesgo.length - 5} más...
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <p className="text-xs text-green-700 font-medium">Todo en orden ✅</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SEGUNDA VUELTA (Duplicado para loop infinito) */}
+                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs text-indigo-700 font-medium">Total Items</p>
+                      <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
+                    </div>
+                    <p className="text-[10px] text-indigo-600">productos activos</p>
+                  </div>
+
+                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Stock Total</p>
+                      <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
+                    </div>
+                    <p className="text-[10px] text-blue-600">unidades en inventario</p>
+                  </div>
+
+                  <div className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col ${
+                    stockBajo > 0 
+                      ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
+                      : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                  }`}>
+                    <p className={`text-xs font-bold flex items-center gap-1 ${
+                      stockBajo > 0 ? 'text-red-700' : 'text-green-700'
+                    }`}>
+                      <AlertTriangle className="w-3 h-3" /> Alertas de Stock
+                      {stockBajo > 0 && <span className="ml-1">({stockBajo})</span>}
+                    </p>
+                    
+                    {stockBajo > 0 ? (
+                      <div className="mt-2 flex-1 overflow-y-auto space-y-1 pr-1">
+                        {productosEnRiesgo.slice(0, 5).map(p => (
+                          <div key={p.id} className="flex justify-between items-center text-[10px] leading-tight">
+                            <span className="truncate flex-1 text-red-800 font-medium">{p.nombre}</span>
+                            <span className="font-bold text-red-600 ml-1 text-[9px] whitespace-nowrap">
+                              {p.stock}{p.stock === 1 ? 'ud' : 'uds'}
+                            </span>
+                          </div>
+                        ))}
+                        {productosEnRiesgo.length > 5 && (
+                          <p className="text-red-600 text-[9px] font-semibold text-center mt-1">
+                            +{productosEnRiesgo.length - 5} más...
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <p className="text-xs text-green-700 font-medium">Todo en orden ✅</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* DESKTOP - Grid estático */}
               <div className="hidden sm:grid sm:grid-cols-3 gap-4">
@@ -207,11 +288,48 @@ function Dashboard({ onLogout }) {
                   <p className="text-lg text-gray-600 font-medium">Stock Total</p>
                   <p className="text-4xl font-bold text-blue-600 mt-2">{totalStock}</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <p className="text-lg text-gray-600 font-medium flex items-center gap-2">
-                    <AlertTriangle className="w-6 h-6 text-red-500" /> Stock Bajo (≤5)
+                    <AlertTriangle className="w-6 h-6 text-red-500" /> Alertas de Stock
                   </p>
-                  <p className={`text-4xl font-bold mt-2 ${stockBajo > 0 ? 'text-red-600' : 'text-green-600'}`}>{stockBajo}</p>
+                  
+                  {stockBajo === 0 ? (
+                    <p className="text-2xl font-bold text-green-600 mt-2">Todo en orden ✅</p>
+                  ) : (
+                    <div className="mt-3 max-h-48 overflow-y-auto pr-2 space-y-2">
+                      {productosEnRiesgo.map(p => (
+                        <div 
+                          key={p.id} 
+                          className={`flex justify-between items-center p-2 rounded-lg ${
+                            p.stock === 0 
+                              ? 'bg-red-100 border border-red-300' 
+                              : 'bg-orange-50 border border-orange-200'
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-semibold text-sm truncate ${
+                              p.stock === 0 ? 'text-red-800' : 'text-orange-800'
+                            }`}>
+                              {p.nombre}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {p.categoria} • {p.talle || 'N/A'}
+                            </p>
+                          </div>
+                          <div className="text-right ml-2">
+                            <span className={`font-bold text-lg ${
+                              p.stock === 0 ? 'text-red-600' : 'text-orange-600'
+                            }`}>
+                              {p.stock}
+                            </span>
+                            <p className="text-xs text-gray-500">
+                              {p.stock === 0 ? 'Agotado' : 'unidades'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
