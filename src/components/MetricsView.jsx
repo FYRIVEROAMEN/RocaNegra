@@ -1,0 +1,347 @@
+import { useState, useEffect } from 'react'
+import { Download, TrendingUp, Package, Users, AlertTriangle, ShoppingCart, DollarSign } from 'lucide-react'
+import { getVentas, getProductosActivos, getClientesConDeuda } from '../services/api'
+import Swal from 'sweetalert2'
+
+function MetricsView() {
+  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState({
+    ventasMes: 0,
+    ticketPromedio: 0,
+    valorInventario: 0,
+    deudaTotal: 0,
+    totalVentas: 0,
+    topProductos: [],
+    topClientes: [],
+    ventasPorDia: [],
+    stockBajo: []
+  })
+
+  useEffect(() => {
+    fetchMetrics()
+  }, [])
+
+  const fetchMetrics = async () => {
+    setLoading(true)
+    try {
+      const LOCAL_ID = import.meta.env.VITE_LOCAL_ID || 1
+      
+      // 1. Obtener ventas
+      const { data: ventasData } = await getVentas()
+      const ventas = ventasData || []
+      
+      // 2. Obtener productos
+      const { data: productosData } = await getProductosActivos()
+      const productos = productosData || []
+      
+      // 3. Obtener deuda total
+      const { data: deudaData } = await getClientesConDeuda()
+      const deudaTotal = (deudaData || []).reduce((sum, c) => sum + Number(c.deuda_total || 0), 0)
+      
+      // 4. Calcular métricas del mes actual
+      const ahora = new Date()
+      const primerDiaMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
+      
+      const ventasDelMes = ventas.filter(v => {
+        const fechaVenta = new Date(v.fecha)
+        return fechaVenta >= primerDiaMes
+      })
+      
+      const totalVentasMes = ventasDelMes.reduce((sum, v) => sum + Number(v.total || 0), 0)
+      const ticketPromedio = ventasDelMes.length > 0 ? totalVentasMes / ventasDelMes.length : 0
+      
+      // 5. Calcular valor del inventario
+      const valorInventario = productos.reduce((sum, p) => 
+        sum + (Number(p.precio || 0) * Number(p.stock || 0)), 0
+      )
+      
+      // 6. Top 5 productos más vendidos
+      const ventasPorProducto = {}
+      ventasDelMes.forEach(venta => {
+        if (venta.detalle_ventas) {
+          venta.detalle_ventas.forEach(detalle => {
+            const nombre = detalle.productos?.nombre || 'Producto eliminado'
+            if (!ventasPorProducto[nombre]) {
+              ventasPorProducto[nombre] = { cantidad: 0, total: 0 }
+            }
+            ventasPorProducto[nombre].cantidad += detalle.cantidad
+            ventasPorProducto[nombre].total += Number(detalle.precio_unitario * detalle.cantidad)
+          })
+        }
+      })
+      
+      const topProductos = Object.entries(ventasPorProducto)
+        .map(([nombre, datos]) => ({ nombre, ...datos }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5)
+      
+      // 7. Top 5 clientes (si tenemos datos)
+      const ventasPorCliente = {}
+      ventasDelMes.forEach(venta => {
+        if (venta.cliente_id) {
+          const clienteNombre = venta.clientes?.nombre || `Cliente ${venta.cliente_telefono || 'Anónimo'}`
+          if (!ventasPorCliente[clienteNombre]) {
+            ventasPorCliente[clienteNombre] = { cantidad: 0, total: 0 }
+          }
+          ventasPorCliente[clienteNombre].cantidad += 1
+          ventasPorCliente[clienteNombre].total += Number(venta.total || 0)
+        }
+      })
+      
+      const topClientes = Object.entries(ventasPorCliente)
+        .map(([nombre, datos]) => ({ nombre, ...datos }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+      
+      // 8. Ventas por día (últimos 7 días)
+      const ventasPorDiaMap = {}
+      for (let i = 6; i >= 0; i--) {
+        const fecha = new Date()
+        fecha.setDate(fecha.getDate() - i)
+        const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+        ventasPorDiaMap[fechaStr] = 0
+      }
+      
+      ventasDelMes.forEach(venta => {
+        const fechaVenta = new Date(venta.fecha)
+        const diffDias = Math.floor((ahora - fechaVenta) / (1000 * 60 * 60 * 24))
+        if (diffDias <= 6 && diffDias >= 0) {
+          const fechaStr = fechaVenta.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+          ventasPorDiaMap[fechaStr] = (ventasPorDiaMap[fechaStr] || 0) + Number(venta.total || 0)
+        }
+      })
+      
+      const ventasPorDia = Object.entries(ventasPorDiaMap).map(([fecha, total]) => ({ fecha, total }))
+      
+      // 9. Productos con stock bajo (≤5)
+      const stockBajo = productos
+        .filter(p => p.stock <= 5)
+        .sort((a, b) => a.stock - b.stock)
+        .slice(0, 5)
+      
+      setMetrics({
+        ventasMes: totalVentasMes,
+        ticketPromedio,
+        valorInventario,
+        deudaTotal,
+        totalVentas: ventasDelMes.length,
+        topProductos,
+        topClientes,
+        ventasPorDia,
+        stockBajo
+      })
+      
+    } catch (err) {
+      console.error('Error al cargar métricas:', err)
+    }
+    setLoading(false)
+  }
+
+  const exportarVentasCSV = () => {
+    // Implementación básica - se puede mejorar
+    Swal.fire({
+      title: 'Exportar Ventas',
+      text: 'Función en desarrollo',
+      icon: 'info',
+      timer: 1500
+    })
+  }
+
+  const exportarInventarioCSV = () => {
+    Swal.fire({
+      title: 'Exportar Inventario',
+      text: 'Función en desarrollo',
+      icon: 'info',
+      timer: 1500
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200 max-w-7xl mx-auto">
+      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800 flex items-center gap-3">
+        📈 Métricas y Estadísticas
+      </h2>
+
+      {/* KPIs Principales */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-blue-700 font-medium">Ventas del Mes</p>
+            <DollarSign className="w-5 h-5 text-blue-600" />
+          </div>
+          <p className="text-3xl font-bold text-blue-900">${metrics.ventasMes.toFixed(2)}</p>
+          <p className="text-xs text-blue-600 mt-1">{metrics.totalVentas} transacciones</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-green-700 font-medium">Ticket Promedio</p>
+            <TrendingUp className="w-5 h-5 text-green-600" />
+          </div>
+          <p className="text-3xl font-bold text-green-900">${metrics.ticketPromedio.toFixed(2)}</p>
+          <p className="text-xs text-green-600 mt-1">por venta</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-purple-700 font-medium">Valor Inventario</p>
+            <Package className="w-5 h-5 text-purple-600" />
+          </div>
+          <p className="text-3xl font-bold text-purple-900">${metrics.valorInventario.toFixed(2)}</p>
+          <p className="text-xs text-purple-600 mt-1">en stock</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-red-700 font-medium">Deuda Pendiente</p>
+            <AlertTriangle className="w-5 h-5 text-red-600" />
+          </div>
+          <p className="text-3xl font-bold text-red-900">${metrics.deudaTotal.toFixed(2)}</p>
+          <p className="text-xs text-red-600 mt-1">por cobrar</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 sm:col-span-2 lg:col-span-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-orange-700 font-medium">Resumen del Mes</p>
+            <ShoppingCart className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="grid grid-cols-3 gap-4 mt-3">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-900">{metrics.totalVentas}</p>
+              <p className="text-xs text-orange-600">Ventas</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-900">{metrics.topProductos.length}</p>
+              <p className="text-xs text-orange-600">Productos vendidos</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-900">{metrics.topClientes.length}</p>
+              <p className="text-xs text-orange-600">Clientes activos</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ventas por Día (Gráfico simple de barras) */}
+      <div className="mb-8">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Ventas de los Últimos 7 Días</h3>
+        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+          <div className="flex items-end justify-between h-40 gap-2">
+            {metrics.ventasPorDia.map((dia, idx) => {
+              const maxVenta = Math.max(...metrics.ventasPorDia.map(d => d.total))
+              const altura = maxVenta > 0 ? (dia.total / maxVenta) * 100 : 0
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+                  <div 
+                    className="w-full bg-blue-500 rounded-t-lg transition-all duration-500"
+                    style={{ height: `${Math.max(altura, 5)}%` }}
+                    title={`$${dia.total.toFixed(2)}`}
+                  ></div>
+                  <p className="text-xs text-gray-600 font-medium">{dia.fecha}</p>
+                  <p className="text-xs text-gray-500">${dia.total > 1000 ? `${(dia.total/1000).toFixed(1)}k` : dia.total.toFixed(0)}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Productos */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">🏆 Top 5 Productos Más Vendidos</h3>
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+            {metrics.topProductos.length > 0 ? (
+              metrics.topProductos.map((prod, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-bold text-gray-400">#{idx + 1}</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">{prod.nombre}</p>
+                      <p className="text-xs text-gray-600">{prod.cantidad} unidades</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-green-700">${prod.total.toFixed(2)}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 py-8">No hay ventas este mes</p>
+            )}
+          </div>
+        </div>
+
+        {/* Top Clientes */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">👥 Top 5 Clientes</h3>
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+            {metrics.topClientes.length > 0 ? (
+              metrics.topClientes.map((cliente, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <Users className="w-8 h-8 text-blue-500" />
+                    <div>
+                      <p className="font-semibold text-gray-800">{cliente.nombre}</p>
+                      <p className="text-xs text-gray-600">{cliente.cantidad} compras</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-blue-700">${cliente.total.toFixed(2)}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 py-8">No hay clientes registrados</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Productos con Stock Bajo */}
+      <div className="mt-8">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">️ Productos con Stock Bajo</h3>
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+          {metrics.stockBajo.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {metrics.stockBajo.map((prod, idx) => (
+                <div key={idx} className="bg-white p-3 rounded-lg border border-red-200 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{prod.nombre}</p>
+                    <p className="text-xs text-gray-600">{prod.categoria || 'Sin categoría'}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                    prod.stock === 0 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                  }`}>
+                    {prod.stock === 0 ? 'Agotado' : `${prod.stock} uds`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-green-700 py-4">✅ Todo el stock está en orden</p>
+          )}
+        </div>
+      </div>
+
+      {/* Botones de Exportación */}
+      <div className="mt-8 flex flex-wrap gap-3">
+        <button onClick={exportarVentasCSV} className="btn btn-success flex items-center gap-2">
+          <Download className="w-5 h-5" /> Exportar Ventas del Mes
+        </button>
+        <button onClick={exportarInventarioCSV} className="btn btn-primary flex items-center gap-2">
+          <Download className="w-5 h-5" /> Exportar Inventario
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default MetricsView

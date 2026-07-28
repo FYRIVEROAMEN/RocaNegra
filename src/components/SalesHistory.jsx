@@ -29,9 +29,11 @@ function SalesHistory() {
       const ventasData = response.data || []
       
       const ventasAdaptadas = ventasData.map(venta => ({
-        ...venta,
-        detalle: venta.detalle_ventas || []
-      }))
+  ...venta,
+  detalle: venta.detalle_ventas || [],
+  cliente_nombre: venta.clientes?.nombre || null,
+  cliente_telefono: venta.clientes?.telefono || null
+}))
       
       setVentas(ventasAdaptadas)
     } catch (err) {
@@ -106,122 +108,175 @@ function SalesHistory() {
     link.click()
   }
 
-  const deleteOldVentas = async (days) => {
-    const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      html: `Se eliminarán <strong>TODAS</strong> las ventas de hace más de <strong>${days} días</strong>.\n\n⚠️ Esta acción no se puede deshacer.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, eliminar todo',
-      cancelButtonText: 'Cancelar'
-    })
-
-    if (!result.isConfirmed) return
-
-    try {
-      const cutoffDate = new Date()
-      cutoffDate.setDate(cutoffDate.getDate() - days)
-      
-      const LOCAL_ID = import.meta.env.VITE_LOCAL_ID || 1
-      
-      // 1. Obtener TODAS las ventas del local
-      const { data: todasLasVentas, error: errorFetch } = await supabase
-        .from('ventas')
-        .select('id, fecha')
-        .eq('local_id', LOCAL_ID)
-      
-      if (errorFetch) throw new Error('Error al obtener ventas: ' + errorFetch.message)
-      
-      // 2. Filtrar las que son más viejas que cutoffDate
-      const ventasAEliminar = (todasLasVentas || []).filter(v => {
-        const ventaDate = new Date(v.fecha)
-        return ventaDate < cutoffDate
+    const deleteOldVentas = async (days) => {
+      const result = await Swal.fire({
+        title: '¿Estás seguro?',
+        html: `Se eliminarán <strong>TODAS</strong> las ventas de hace más de <strong>${days} días</strong>.\n\n⚠️ Los clientes con deuda perderán el historial de compras.\n\nEsta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Sí, eliminar todo',
+        cancelButtonText: 'Cancelar'
       })
-      
-      if (ventasAEliminar.length === 0) {
-        Swal.fire({
-          title: 'No hay ventas antiguas',
-          text: `No se encontraron ventas de hace más de ${days} días.`,
-          icon: 'info',
-          confirmButtonColor: '#16a34a',
-          timer: 2000
+
+      if (!result.isConfirmed) return
+
+      try {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - days)
+        
+        const LOCAL_ID = import.meta.env.VITE_LOCAL_ID || 1
+        
+        // 1. Obtener TODAS las ventas del local
+        const { data: todasLasVentas, error: errorFetch } = await supabase
+          .from('ventas')
+          .select('id, fecha, cliente_id')
+          .eq('local_id', LOCAL_ID)
+        
+        if (errorFetch) throw new Error('Error al obtener ventas: ' + errorFetch.message)
+        
+        // 2. Filtrar las que son más viejas que cutoffDate
+        const ventasAEliminar = (todasLasVentas || []).filter(v => {
+          const ventaDate = new Date(v.fecha)
+          return ventaDate < cutoffDate
         })
-        return
-      }
-      
-      // Mostrar progreso
-      Swal.fire({
-        title: 'Eliminando...',
-        text: `Procesando ${ventasAEliminar.length} ventas`,
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading()
+        
+        if (ventasAEliminar.length === 0) {
+          Swal.fire({
+            title: 'No hay ventas antiguas',
+            text: `No se encontraron ventas de hace más de ${days} días.`,
+            icon: 'info',
+            confirmButtonColor: '#16a34a',
+            timer: 2000
+          })
+          return
         }
-      })
-      
-      // 3. Eliminar una por una (con cascade)
-      let eliminadas = 0
-      let errores = 0
-      
-      for (const venta of ventasAEliminar) {
-        try {
-          // Eliminar detalles primero
-          await supabase
-            .from('detalle_ventas')
-            .delete()
-            .eq('venta_id', venta.id)
-          
-          // Eliminar la venta
-          const { error } = await supabase
-            .from('ventas')
-            .delete()
-            .eq('id', venta.id)
-          
-          if (error) {
-            errores++
-            console.error(`Error al eliminar venta ${venta.id}:`, error)
-          } else {
-            eliminadas++
+        
+        // 3. Obtener los cliente_ids afectados
+        const clienteIdsAfectados = [...new Set(ventasAEliminar.map(v => v.cliente_id).filter(Boolean))]
+        
+        // Mostrar progreso
+        Swal.fire({
+          title: 'Eliminando...',
+          text: `Procesando ${ventasAEliminar.length} ventas`,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading()
           }
-        } catch (err) {
-          errores++
-          console.error(`Error en venta ${venta.id}:`, err)
+        })
+        
+        // 4. Eliminar pagos asociados primero
+        const ventaIds = ventasAEliminar.map(v => v.id)
+        await supabase
+          .from('pagos')
+          .delete()
+          .in('venta_id', ventaIds)
+        
+        // 5. Eliminar las ventas
+        let eliminadas = 0
+        let errores = 0
+        
+        for (const venta of ventasAEliminar) {
+          try {
+            const { error } = await supabase
+              .from('ventas')
+              .delete()
+              .eq('id', venta.id)
+            
+            if (error) {
+              errores++
+              console.error(`Error al eliminar venta ${venta.id}:`, error)
+            } else {
+              eliminadas++
+            }
+          } catch (err) {
+            errores++
+            console.error(`Error en venta ${venta.id}:`, err)
+          }
         }
-      }
-      
-      // 4. Recargar la lista
-      await fetchVentas()
-      
-      // 5. Mostrar resultado
-      if (errores === 0) {
-        Swal.fire({
-          title: '¡Eliminadas!',
-          text: `Se eliminaron ${eliminadas} ventas y sus detalles.`,
-          icon: 'success',
-          confirmButtonColor: '#16a34a',
-          timer: 2000
-        })
-      } else {
-        Swal.fire({
-          title: 'Proceso completado',
-          html: `Se eliminaron ${eliminadas} ventas.<br>Errores: ${errores}`,
-          icon: 'warning',
-          confirmButtonColor: '#f59e0b'
-        })
-      }
-      
-    } catch (err) {
-      console.error('Error completo:', err)
+        
+        // 6. Recalcular deudas de clientes afectados
+        for (const clienteId of clienteIdsAfectados) {
+          try {
+            // Obtener todas las ventas restantes del cliente
+            const { data: ventasRestantes } = await supabase
+              .from('ventas')
+              .select('id, total, estado_pago')
+              .eq('cliente_id', clienteId)
+            
+            if (ventasRestantes && ventasRestantes.length > 0) {
+              // Calcular total de compras y pagos
+              let totalCompras = 0
+              let totalPagado = 0
+              
+              for (const venta of ventasRestantes) {
+                totalCompras += Number(venta.total)
+                
+                const { data: pagos } = await supabase
+                  .from('pagos')
+                  .select('monto')
+                  .eq('venta_id', venta.id)
+                
+                totalPagado += (pagos || []).reduce((sum, p) => sum + Number(p.monto), 0)
+              }
+              
+              // Actualizar cliente
+              await supabase
+                .from('clientes')
+                .update({
+                  total_compras: totalCompras,
+                  total_pagado: totalPagado,
+                  deuda_total: totalCompras - totalPagado
+                })
+                .eq('id', clienteId)
+            } else {
+              // Si no quedan ventas, poner todo en 0
+              await supabase
+                .from('clientes')
+                .update({
+                  total_compras: 0,
+                  total_pagado: 0,
+                  deuda_total: 0
+                })
+                .eq('id', clienteId)
+            }
+          } catch (err) {
+            console.error('Error al recalcular deuda:', err)
+          }
+        }
+    
+    // 7. Recargar la lista
+    await fetchVentas()
+    
+    // 8. Mostrar resultado
+    if (errores === 0) {
       Swal.fire({
-        title: 'Error',
-        text: 'No se pudieron eliminar las ventas: ' + err.message,
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
+        title: '¡Eliminadas!',
+        text: `Se eliminaron ${eliminadas} ventas y se actualizaron las deudas.`,
+        icon: 'success',
+        confirmButtonColor: '#16a34a',
+        timer: 2000
+      })
+    } else {
+      Swal.fire({
+        title: 'Proceso completado',
+        html: `Se eliminaron ${eliminadas} ventas.<br>Errores: ${errores}`,
+        icon: 'warning',
+        confirmButtonColor: '#f59e0b'
       })
     }
+    
+  } catch (err) {
+    console.error('Error completo:', err)
+    Swal.fire({
+      title: 'Error',
+      text: 'No se pudieron eliminar las ventas: ' + err.message,
+      icon: 'error',
+      confirmButtonColor: '#dc2626'
+    })
   }
+}
 
   const deleteSingleVenta = async (id) => {
     const result = await Swal.fire({
@@ -397,24 +452,103 @@ function SalesHistory() {
       )}
 
       {showDetail && selectedVenta && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-2xl font-bold">Detalle #{selectedVenta.id}</h3>
-              <button onClick={() => setShowDetail(false)} className="btn btn-secondary">Cerrar</button>
+  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-2xl font-bold">Detalle #{selectedVenta.id}</h3>
+        <button onClick={() => setShowDetail(false)} className="btn btn-secondary">Cerrar</button>
+      </div>
+      
+      {/* Información del cliente */}
+      {selectedVenta.cliente_id && (
+        <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4">
+          <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+            👤 Información del Cliente
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-gray-600">Nombre:</p>
+              <p className="font-semibold text-gray-800">
+                {selectedVenta.cliente_nombre || 'Sin nombre'}
+              </p>
             </div>
-            
-            <div className="space-y-2">
-              {selectedVenta.detalle?.map((item, idx) => (
-                <div key={idx} className="border p-4 rounded-lg">
-                  <p className="font-bold">{item.productos?.nombre || 'Eliminado'}</p>
-                  <p className="text-sm">{item.cantidad} x ${item.precio_unitario}</p>
-                </div>
-              ))}
+            <div>
+              <p className="text-gray-600">Teléfono:</p>
+              <p className="font-semibold text-gray-800">
+                {selectedVenta.cliente_telefono || 'No registrado'}
+              </p>
             </div>
           </div>
+          
+          {/* Botón WhatsApp */}
+          {selectedVenta.cliente_telefono && (
+            <button
+              onClick={() => {
+                // Generar mensaje de WhatsApp con el detalle de la venta
+                const fecha = new Date(selectedVenta.fecha).toLocaleString('es-AR')
+                let mensaje = `*COMPROBANTE DE VENTA* 🧾\n`
+                mensaje += `━━━━━━━━━━━━━━━━━━━━\n`
+                mensaje += `📅 ${fecha}\n`
+                mensaje += ` Venta #${selectedVenta.id}\n`
+                mensaje += `━━━━━━━━━━━━━━━━━━━━\n\n`
+                mensaje += `*PRODUCTOS:*\n`
+                
+                if (selectedVenta.detalle && selectedVenta.detalle.length > 0) {
+                  selectedVenta.detalle.forEach(item => {
+                    const subtotal = (item.cantidad * item.precio_unitario).toFixed(2)
+                    mensaje += `${item.cantidad}x ${item.productos?.nombre || 'Producto eliminado'}\n`
+                    mensaje += `   $${subtotal}\n`
+                  })
+                }
+                
+                mensaje += `\n━━━━━━━━━━━━━━━━━━━━\n`
+                mensaje += `*TOTAL: $${Number(selectedVenta.total).toFixed(2)}*\n`
+                mensaje += `━━━━━━━━━━━━━━━━━━━━\n\n`
+                mensaje += `¡Gracias por tu compra! `
+                
+                const url = `https://wa.me/549${selectedVenta.cliente_telefono}?text=${encodeURIComponent(mensaje)}`
+                window.open(url, '_blank')
+              }}
+              className="btn btn-success w-full mt-3 flex items-center justify-center gap-2"
+            >
+              📱 Enviar comprobante por WhatsApp
+            </button>
+          )}
         </div>
       )}
+      
+      {/* Productos */}
+      <div className="space-y-2">
+        <h4 className="font-bold text-gray-700">📦 Productos:</h4>
+        {selectedVenta.detalle?.map((item, idx) => (
+          <div key={idx} className="border p-4 rounded-lg flex justify-between items-center">
+            <div className="flex-1">
+              <p className="font-bold">{item.productos?.nombre || 'Eliminado'}</p>
+              <p className="text-sm text-gray-600">
+                {item.cantidad} x ${item.precio_unitario} c/u
+                {item.productos?.talle && ` | Talle: ${item.productos.talle}`}
+                {item.productos?.color && ` | Color: ${item.productos.color}`}
+              </p>
+            </div>
+            <p className="font-bold text-lg text-gray-800">
+              ${(item.cantidad * item.precio_unitario).toFixed(2)}
+            </p>
+          </div>
+        ))}
+      </div>
+      
+      {/* Total */}
+      <div className="mt-4 pt-4 border-t-2 border-gray-300">
+        <div className="flex justify-between items-center">
+          <span className="text-xl font-bold text-gray-700">Total:</span>
+          <span className="text-3xl font-bold text-green-700">
+            ${Number(selectedVenta.total).toFixed(2)}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   )
 }
