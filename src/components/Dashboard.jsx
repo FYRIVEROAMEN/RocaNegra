@@ -9,7 +9,6 @@ import Swal from 'sweetalert2'
 import MetricsView from './MetricsView'
 import ClientesView from './ClientesView'
 
-
 function Dashboard({ onLogout }) {
   const [productos, setProductos] = useState([])
   const [search, setSearch] = useState('')
@@ -22,7 +21,6 @@ function Dashboard({ onLogout }) {
   const [showTutorial, setShowTutorial] = useState(false)
   const [addedToCart, setAddedToCart] = useState(null)
   const [cart, setCart] = useState([])
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
 
   const fetchProductos = useCallback(async () => {
@@ -54,15 +52,43 @@ function Dashboard({ onLogout }) {
   }, [fetchProductos])
 
   const handleDelete = async (id) => {
-    if (window.confirm('¿Desactivar este producto?\n\nNo se borrará de la base de datos para no romper el historial de ventas, pero dejará de aparecer en el inventario.')) {
-      try {
-        await deactivateProducto(id)
-        fetchProductos()
-      } catch (err) {
-        alert('Error al desactivar: ' + (err.response?.data?.message || err.message))
-      }
+  const result = await Swal.fire({
+    title: '¿Desactivar producto?',
+    html: `
+      <p style="margin-bottom: 10px;">Este producto dejará de aparecer en el inventario.</p>
+      <p style="color: #6b7280; font-size: 0.9rem;">
+        No se borrará de la base de datos para no romper el historial de ventas.
+        Podés reactivarlo después desde "Ver productos desactivados".
+      </p>
+    `,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, desactivar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#6b7280'
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await deactivateProducto(id)
+      fetchProductos()
+      Swal.fire({
+        title: 'Producto desactivado',
+        text: 'Podés reactivarlo cuando quieras',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (err) {
+      Swal.fire({
+        title: 'Error',
+        text: err.response?.data?.message || err.message,
+        icon: 'error'
+      })
     }
   }
+}
 
   const handleReactivar = async (id) => {
     try {
@@ -99,7 +125,7 @@ function Dashboard({ onLogout }) {
       }
       
       Swal.fire({
-        title: '¡Agregado al carrito!',
+        title: 'Agregado al carrito!',
         text: `${product.nombre} (${newCart.reduce((sum, item) => item.id === product.id ? item.quantity : sum, 0)} en total)`,
         icon: 'success',
         toast: true,
@@ -126,6 +152,10 @@ function Dashboard({ onLogout }) {
   const productosEnRiesgo = productos
     .filter(p => p.stock <= 5)
     .sort((a, b) => a.stock - b.stock)
+
+  const scrollToProductos = () => {
+    window.scrollTo({ top: 450, behavior: 'smooth' })
+  }
 
   return (
     <div className="min-h-screen pb-32 md:pb-8">
@@ -175,41 +205,52 @@ function Dashboard({ onLogout }) {
                 STATS: Cards compactas (mobile) / Grid (desktop)
                 ========================================== */}
             <div className="mb-6">
-              {/* MOBILE - Carrusel con Cards Compactas */}
+              {/* MOBILE - Carrusel MANUAL (sin auto-scroll) */}
               <div 
-                className="sm:hidden auto-scroll-container"
-                onMouseEnter={() => setIsCarouselPaused(true)}
-                onMouseLeave={() => setIsCarouselPaused(false)}
-                onTouchStart={() => setIsCarouselPaused(true)}
-                onTouchEnd={() => setIsCarouselPaused(false)}
+                className="sm:hidden overflow-x-auto -mx-4 px-4"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
-                <div className={`auto-scroll-track ${isCarouselPaused ? 'paused' : ''}`}>
-                  {/* PRIMERA VUELTA */}
+                <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
                   
-                  {/* Card 1: Total Items */}
-                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between">
+                  {/* Card 1: Total Items -> Va a Métricas */}
+                  <button
+                    onClick={() => setCurrentView('metrics')}
+                    className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer"
+                  >
                     <div>
                       <p className="text-xs text-indigo-700 font-medium">Total Items</p>
                       <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
                     </div>
                     <p className="text-[10px] text-indigo-600">productos activos</p>
-                  </div>
+                  </button>
 
-                  {/* Card 2: Stock Total */}
-                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between">
+                  {/* Card 2: Stock Total -> Va a Inventario */}
+                  <button
+                    onClick={() => {
+                      setCurrentView('dashboard');
+                      setTimeout(() => scrollToProductos(), 100);
+                    }}
+                    className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer"
+                  >
                     <div>
                       <p className="text-xs text-blue-700 font-medium">Stock Total</p>
                       <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
                     </div>
                     <p className="text-[10px] text-blue-600">unidades en inventario</p>
-                  </div>
+                  </button>
 
-                  {/* Card 3: Alertas de Stock */}
-                  <div className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col ${
-                    stockBajo > 0 
-                      ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
-                      : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
-                  }`}>
+                  {/* Card 3: Alertas de Stock -> Va a Inventario */}
+                  <button
+                    onClick={() => {
+                      setCurrentView('dashboard');
+                      if (stockBajo > 0) setTimeout(() => scrollToProductos(), 100);
+                    }}
+                    className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer ${
+                      stockBajo > 0 
+                        ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
+                        : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                    }`}
+                  >
                     <p className={`text-xs font-bold flex items-center gap-1 ${
                       stockBajo > 0 ? 'text-red-700' : 'text-green-700'
                     }`}>
@@ -235,33 +276,48 @@ function Dashboard({ onLogout }) {
                       </div>
                     ) : (
                       <div className="flex-1 flex items-center justify-center">
-                        <p className="text-xs text-green-700 font-medium">Todo en orden ✅</p>
+                        <p className="text-xs text-green-700 font-medium">Todo en orden</p>
                       </div>
                     )}
-                  </div>
+                  </button>
 
-                  {/* SEGUNDA VUELTA (Duplicado para loop infinito) */}
-                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between">
+                  {/* DUPLICADO PARA SCROLL INFINITO */}
+                  <button
+                    onClick={() => setCurrentView('metrics')}
+                    className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl border border-indigo-200 flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer"
+                  >
                     <div>
                       <p className="text-xs text-indigo-700 font-medium">Total Items</p>
                       <p className="text-3xl font-bold text-indigo-900 mt-1">{totalProductos}</p>
                     </div>
                     <p className="text-[10px] text-indigo-600">productos activos</p>
-                  </div>
+                  </button>
 
-                  <div className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between">
+                  <button
+                    onClick={() => {
+                      setCurrentView('dashboard');
+                      setTimeout(() => scrollToProductos(), 100);
+                    }}
+                    className="shrink-0 w-[70vw] h-[140px] p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer"
+                  >
                     <div>
                       <p className="text-xs text-blue-700 font-medium">Stock Total</p>
                       <p className="text-3xl font-bold text-blue-600 mt-1">{totalStock}</p>
                     </div>
                     <p className="text-[10px] text-blue-600">unidades en inventario</p>
-                  </div>
+                  </button>
 
-                  <div className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col ${
-                    stockBajo > 0 
-                      ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
-                      : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
-                  }`}>
+                  <button
+                    onClick={() => {
+                      setCurrentView('dashboard');
+                      if (stockBajo > 0) setTimeout(() => scrollToProductos(), 100);
+                    }}
+                    className={`shrink-0 w-[70vw] h-[140px] p-3 rounded-2xl border flex flex-col justify-between hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer ${
+                      stockBajo > 0 
+                        ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
+                        : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                    }`}
+                  >
                     <p className={`text-xs font-bold flex items-center gap-1 ${
                       stockBajo > 0 ? 'text-red-700' : 'text-green-700'
                     }`}>
@@ -287,10 +343,10 @@ function Dashboard({ onLogout }) {
                       </div>
                     ) : (
                       <div className="flex-1 flex items-center justify-center">
-                        <p className="text-xs text-green-700 font-medium">Todo en orden ✅</p>
+                        <p className="text-xs text-green-700 font-medium">Todo en orden</p>
                       </div>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -310,7 +366,7 @@ function Dashboard({ onLogout }) {
                   </p>
                   
                   {stockBajo === 0 ? (
-                    <p className="text-2xl font-bold text-green-600 mt-2">Todo en orden ✅</p>
+                    <p className="text-2xl font-bold text-green-600 mt-2">Todo en orden</p>
                   ) : (
                     <div className="mt-3 max-h-48 overflow-y-auto pr-2 space-y-2">
                       {productosEnRiesgo.map(p => (
@@ -402,13 +458,13 @@ function Dashboard({ onLogout }) {
                         <div className="product-price">${Number(p.precio).toFixed(2)}</div>
                         <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '8px' }}>
                           <button onClick={() => { addToCartFromDashboard(p); setAddedToCart(p.id); setTimeout(() => setAddedToCart(null), 2000); }} className="btn btn-success touch-target" style={{ flex: 1, position: 'relative', background: addedToCart === p.id ? '#16a34a' : '#22c55e' }} disabled={p.stock <= 0}>
-                            <ShoppingCart size={18} /> {addedToCart === p.id ? '✓ Agregado' : 'Vender'}
+                            <ShoppingCart size={18} /> {addedToCart === p.id ? 'Agregado' : 'Vender'}
                           </button>
                           <button onClick={() => { setShowForm(true); setEditId(p.id); }} className="btn btn-secondary touch-target" style={{ flex: 1 }}>
                             <Edit2 size={18} /> Editar
                           </button>
                           <button onClick={() => handleDelete(p.id)} className="btn btn-danger touch-target" style={{ flex: 1 }}>
-                            <Trash2 size={18} /> Eliminar
+                            <Trash2 size={18} /> Desactivar
                           </button>
                         </div>
                       </div>
@@ -513,69 +569,69 @@ function Dashboard({ onLogout }) {
               </div>
             )}
           </>
-      ) : currentView === 'sales' ? (
-  <SalesForm onSaleRecorded={fetchProductos} productos={productos} cart={cart} setCart={setCart} />
-) : currentView === 'history' ? (
-  <SalesHistory />
-) : currentView === 'clientes' ? (
-  <ClientesView />
-) : currentView === 'metrics' ? (
-  <MetricsView />
-) : null}
+        ) : currentView === 'sales' ? (
+          <SalesForm onSaleRecorded={fetchProductos} productos={productos} cart={cart} setCart={setCart} />
+        ) : currentView === 'history' ? (
+          <SalesHistory />
+        ) : currentView === 'clientes' ? (
+          <ClientesView />
+        ) : currentView === 'metrics' ? (
+      <MetricsView onNavigate={setCurrentView} />
+        ) : null}
       </main>
 
       <nav id="bottom-nav" className="bottom-nav">
-          <button onClick={() => { setCurrentView('dashboard'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`}>
-            <Package className="w-6 h-6" /> <span>Inventario</span>
-          </button>
-          <button onClick={() => { setCurrentView('sales'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'sales' ? 'active' : ''}`}>
-            <ShoppingCart className="w-6 h-6" /> <span>Ventas</span>
-            {cart.length > 0 && (
-              <span className="ml-1 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{cart.length}</span>
-            )}
-          </button>
-          <button onClick={() => { setCurrentView('history'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'history' ? 'active' : ''}`}>
-            <BarChart3 className="w-6 h-6" /> <span>Historial</span>
-          </button>
-          
-          {/* Botón "Más" */}
-          <button onClick={() => setShowMoreMenu(!showMoreMenu)} className={`nav-item ${showMoreMenu ? 'active' : ''}`}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-            <span>Más</span>
-          </button>
-
-          {/* Menú desplegable */}
-          {showMoreMenu && (
-            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-              <button 
-                onClick={() => { setCurrentView('clientes'); setShowMoreMenu(false); }}
-                className="w-full text-left px-5 py-4 text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100"
-              >
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <div>
-                  <p className="font-semibold">Clientes</p>
-                  <p className="text-xs text-gray-500">Deudas y pagos</p>
-                </div>
-              </button>
-              <button 
-                onClick={() => { setCurrentView('metrics'); setShowMoreMenu(false); }}
-                className="w-full text-left px-5 py-4 text-gray-700 hover:bg-blue-50 flex items-center gap-3"
-              >
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <div>
-                  <p className="font-semibold">Métricas</p>
-                  <p className="text-xs text-gray-500">Estadísticas y reportes</p>
-                </div>
-              </button>
-            </div>
+        <button onClick={() => { setCurrentView('dashboard'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`}>
+          <Package className="w-6 h-6" /> <span>Inventario</span>
+        </button>
+        <button onClick={() => { setCurrentView('sales'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'sales' ? 'active' : ''}`}>
+          <ShoppingCart className="w-6 h-6" /> <span>Ventas</span>
+          {cart.length > 0 && (
+            <span className="ml-1 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{cart.length}</span>
           )}
-        </nav>
+        </button>
+        <button onClick={() => { setCurrentView('history'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'history' ? 'active' : ''}`}>
+          <BarChart3 className="w-6 h-6" /> <span>Historial</span>
+        </button>
+        
+        {/* Botón "Más" */}
+        <button onClick={() => setShowMoreMenu(!showMoreMenu)} className={`nav-item ${showMoreMenu ? 'active' : ''}`}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          </svg>
+          <span>Más</span>
+        </button>
+
+        {/* Menú desplegable */}
+        {showMoreMenu && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+            <button 
+              onClick={() => { setCurrentView('clientes'); setShowMoreMenu(false); }}
+              className="w-full text-left px-5 py-4 text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100"
+            >
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <div>
+                <p className="font-semibold">Clientes</p>
+                <p className="text-xs text-gray-500">Deudas y pagos</p>
+              </div>
+            </button>
+            <button 
+              onClick={() => { setCurrentView('metrics'); setShowMoreMenu(false); }}
+              className="w-full text-left px-5 py-4 text-gray-700 hover:bg-blue-50 flex items-center gap-3"
+            >
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <div>
+                <p className="font-semibold">Métricas</p>
+                <p className="text-xs text-gray-500">Estadísticas y reportes</p>
+              </div>
+            </button>
+          </div>
+        )}
+      </nav>
 
       {showForm && <ProductForm onClose={() => setShowForm(false)} editId={editId} onSave={fetchProductos} />}
       {showTutorial && <Tutorial onComplete={() => setShowTutorial(false)} />}

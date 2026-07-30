@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Download, TrendingUp, Package, Users, AlertTriangle, ShoppingCart, DollarSign } from 'lucide-react'
+import { Download, TrendingUp, Package, Users, AlertTriangle, ShoppingCart, DollarSign, ArrowRight } from 'lucide-react'
 import { getVentas, getProductosActivos, getClientesConDeuda } from '../services/api'
 import Swal from 'sweetalert2'
 
-function MetricsView() {
+function MetricsView({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [metrics, setMetrics] = useState({
     ventasMes: 0,
@@ -24,8 +24,6 @@ function MetricsView() {
   const fetchMetrics = async () => {
     setLoading(true)
     try {
-      const LOCAL_ID = import.meta.env.VITE_LOCAL_ID || 1
-      
       // 1. Obtener ventas
       const { data: ventasData } = await getVentas()
       const ventas = ventasData || []
@@ -75,7 +73,7 @@ function MetricsView() {
         .sort((a, b) => b.cantidad - a.cantidad)
         .slice(0, 5)
       
-      // 7. Top 5 clientes (si tenemos datos)
+      // 7. Top 5 clientes
       const ventasPorCliente = {}
       ventasDelMes.forEach(venta => {
         if (venta.cliente_id) {
@@ -138,30 +136,31 @@ function MetricsView() {
   }
 
   const exportarVentasCSV = () => {
-    // Implementación básica - se puede mejorar
     Swal.fire({
       title: 'Exportar Ventas',
-      text: 'Función en desarrollo',
+      text: 'Función disponible en la versión Pro',
       icon: 'info',
-      timer: 1500
+      confirmButtonColor: '#3b82f6',
+      timer: 2000
     })
   }
 
   const exportarInventarioCSV = () => {
     Swal.fire({
       title: 'Exportar Inventario',
-      text: 'Función en desarrollo',
+      text: 'Función disponible en la versión Pro',
       icon: 'info',
-      timer: 1500
+      confirmButtonColor: '#3b82f6',
+      timer: 2000
     })
   }
 
   if (loading) {
     return (
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center min-h-[50vh] flex items-center justify-center">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto"></div>
+          <div className="h-32 bg-gray-200 rounded w-full"></div>
         </div>
       </div>
     )
@@ -170,47 +169,74 @@ function MetricsView() {
   return (
     <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200 max-w-7xl mx-auto">
       <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800 flex items-center gap-3">
-        📈 Métricas y Estadísticas
+        Métricas y Estadísticas
       </h2>
 
-      {/* KPIs Principales */}
+      {/* KPIs Principales - AHORA SON BOTONES CLICKEABLES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200">
+        
+        {/* Card 1: Ventas del Mes -> Historial */}
+        <button
+          onClick={() => onNavigate('history')}
+          className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 text-left hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group w-full"
+        >
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-blue-700 font-medium">Ventas del Mes</p>
-            <DollarSign className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center gap-1 text-blue-600 group-hover:translate-x-1 transition-transform">
+              <DollarSign className="w-5 h-5" />
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
           <p className="text-3xl font-bold text-blue-900">${metrics.ventasMes.toFixed(2)}</p>
           <p className="text-xs text-blue-600 mt-1">{metrics.totalVentas} transacciones</p>
-        </div>
+        </button>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
+        {/* Card 2: Ticket Promedio -> Historial */}
+        <button
+          onClick={() => onNavigate('history')}
+          className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200 text-left hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group w-full"
+        >
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-green-700 font-medium">Ticket Promedio</p>
             <TrendingUp className="w-5 h-5 text-green-600" />
           </div>
           <p className="text-3xl font-bold text-green-900">${metrics.ticketPromedio.toFixed(2)}</p>
           <p className="text-xs text-green-600 mt-1">por venta</p>
-        </div>
+        </button>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200">
+        {/* Card 3: Valor Inventario -> Dashboard (Inventario) */}
+        <button
+          onClick={() => onNavigate('dashboard')}
+          className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200 text-left hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group w-full"
+        >
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-purple-700 font-medium">Valor Inventario</p>
-            <Package className="w-5 h-5 text-purple-600" />
+            <div className="flex items-center gap-1 text-purple-600 group-hover:translate-x-1 transition-transform">
+              <Package className="w-5 h-5" />
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
           <p className="text-3xl font-bold text-purple-900">${metrics.valorInventario.toFixed(2)}</p>
           <p className="text-xs text-purple-600 mt-1">en stock</p>
-        </div>
+        </button>
 
-        <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200">
+        {/* Card 4: Deuda Pendiente -> Clientes */}
+        <button
+          onClick={() => onNavigate('clientes')}
+          className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200 text-left hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group w-full"
+        >
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-red-700 font-medium">Deuda Pendiente</p>
-            <AlertTriangle className="w-5 h-5 text-red-600" />
+            <div className="flex items-center gap-1 text-red-600 group-hover:translate-x-1 transition-transform">
+              <AlertTriangle className="w-5 h-5" />
+              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
           <p className="text-3xl font-bold text-red-900">${metrics.deudaTotal.toFixed(2)}</p>
-          <p className="text-xs text-red-600 mt-1">por cobrar</p>
-        </div>
+          <p className="text-xs text-red-600 mt-1">por cobrar (Ver Clientes)</p>
+        </button>
 
+        {/* Card 5: Resumen del Mes */}
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 sm:col-span-2 lg:col-span-2">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-orange-700 font-medium">Resumen del Mes</p>
@@ -223,11 +249,11 @@ function MetricsView() {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-orange-900">{metrics.topProductos.length}</p>
-              <p className="text-xs text-orange-600">Productos vendidos</p>
+              <p className="text-xs text-orange-600">Productos</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-orange-900">{metrics.topClientes.length}</p>
-              <p className="text-xs text-orange-600">Clientes activos</p>
+              <p className="text-xs text-orange-600">Clientes</p>
             </div>
           </div>
         </div>
@@ -235,7 +261,7 @@ function MetricsView() {
 
       {/* Ventas por Día (Gráfico simple de barras) */}
       <div className="mb-8">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Ventas de los Últimos 7 Días</h3>
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Ventas de los Últimos 7 Días</h3>
         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
           <div className="flex items-end justify-between h-40 gap-2">
             {metrics.ventasPorDia.map((dia, idx) => {
@@ -244,7 +270,7 @@ function MetricsView() {
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2">
                   <div 
-                    className="w-full bg-blue-500 rounded-t-lg transition-all duration-500"
+                    className="w-full bg-blue-500 rounded-t-lg transition-all duration-500 hover:bg-blue-600"
                     style={{ height: `${Math.max(altura, 5)}%` }}
                     title={`$${dia.total.toFixed(2)}`}
                   ></div>
@@ -260,13 +286,13 @@ function MetricsView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Productos */}
         <div>
-          <h3 className="text-xl font-bold text-gray-800 mb-4">🏆 Top 5 Productos Más Vendidos</h3>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Top 5 Productos Más Vendidos</h3>
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
             {metrics.topProductos.length > 0 ? (
               metrics.topProductos.map((prod, idx) => (
                 <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl font-bold text-gray-400">#{idx + 1}</span>
+                    <span className="text-2xl font-bold text-gray-300">#{idx + 1}</span>
                     <div>
                       <p className="font-semibold text-gray-800">{prod.nombre}</p>
                       <p className="text-xs text-gray-600">{prod.cantidad} unidades</p>
@@ -283,13 +309,15 @@ function MetricsView() {
 
         {/* Top Clientes */}
         <div>
-          <h3 className="text-xl font-bold text-gray-800 mb-4">👥 Top 5 Clientes</h3>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Top 5 Clientes</h3>
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
             {metrics.topClientes.length > 0 ? (
               metrics.topClientes.map((cliente, idx) => (
                 <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-lg border border-gray-200">
                   <div className="flex items-center gap-3">
-                    <Users className="w-8 h-8 text-blue-500" />
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                      {cliente.nombre.charAt(0).toUpperCase()}
+                    </div>
                     <div>
                       <p className="font-semibold text-gray-800">{cliente.nombre}</p>
                       <p className="text-xs text-gray-600">{cliente.cantidad} compras</p>
@@ -307,7 +335,15 @@ function MetricsView() {
 
       {/* Productos con Stock Bajo */}
       <div className="mt-8">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">️ Productos con Stock Bajo</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Productos con Stock Bajo</h3>
+          <button 
+            onClick={() => onNavigate('dashboard')}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+          >
+            Ver todo <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
         <div className="bg-red-50 p-4 rounded-xl border border-red-200">
           {metrics.stockBajo.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -326,15 +362,15 @@ function MetricsView() {
               ))}
             </div>
           ) : (
-            <p className="text-center text-green-700 py-4">✅ Todo el stock está en orden</p>
+            <p className="text-center text-green-700 py-4 font-medium">Todo el stock está en orden</p>
           )}
         </div>
       </div>
 
       {/* Botones de Exportación */}
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-8 flex flex-wrap gap-3 pb-8">
         <button onClick={exportarVentasCSV} className="btn btn-success flex items-center gap-2">
-          <Download className="w-5 h-5" /> Exportar Ventas del Mes
+          <Download className="w-5 h-5" /> Exportar Ventas
         </button>
         <button onClick={exportarInventarioCSV} className="btn btn-primary flex items-center gap-2">
           <Download className="w-5 h-5" /> Exportar Inventario

@@ -40,7 +40,7 @@ export const createVenta = (data) => api.post('/ventas', { ...data, local_id: LO
 export const createDetalleVenta = (data) => api.post('/detalle_ventas', { ...data, local_id: LOCAL_ID })
 
 // Obtener historial con detalles y cliente
-export const getVentas = () => api.get(`/ventas?local_id=eq.${LOCAL_ID}&select=id,fecha,total,estado_pago,cliente_id,clientes(id,nombre,telefono),detalle_ventas(cantidad,precio_unitario,productos(nombre,talle,color))&order=fecha.desc`)
+export const getVentas = () => api.get(`/ventas?local_id=eq.${LOCAL_ID}&select=id,fecha,total,estado_pago,cliente_id,clientes(id,nombre,telefono),detalle_ventas(cantidad,precio_unitario,productos(nombre,talle,color)),pagos(monto)&order=fecha.desc`)
 
 export const deleteDetalleVenta = (ventaId) => api.delete(`/detalle_ventas?venta_id=eq.${ventaId}&local_id=eq.${LOCAL_ID}`)
 export const deleteVenta = (id) => api.delete(`/ventas?id=eq.${id}&local_id=eq.${LOCAL_ID}`)
@@ -248,6 +248,35 @@ export const eliminarDeudaCliente = async (clienteId) => {
     .eq('id', clienteId)
   
   if (error) throw error
+}
+
+// Eliminar cliente completamente de la base de datos
+export const eliminarCliente = async (clienteId) => {
+  try {
+    // 1. Primero eliminar todos los pagos asociados
+    await supabase
+      .from('pagos')
+      .delete()
+      .eq('cliente_id', clienteId)
+    
+    // 2. Luego, desvincular las ventas (setear cliente_id a NULL)
+    // Esto es mejor que borrar las ventas porque mantenés el historial
+    await supabase
+      .from('ventas')
+      .update({ cliente_id: null })
+      .eq('cliente_id', clienteId)
+    
+    // 3. Finalmente eliminar el cliente
+    const { error } = await supabase
+      .from('clientes')
+      .delete()
+      .eq('id', clienteId)
+    
+    if (error) throw error
+  } catch (err) {
+    console.error('Error al eliminar cliente:', err)
+    throw err
+  }
 }
 
 export default api

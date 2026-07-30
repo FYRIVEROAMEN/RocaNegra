@@ -507,7 +507,7 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                   onClick={handleCheckout} disabled={isProcessing}
                   className="btn btn-success w-full" style={{ minHeight: '64px', fontSize: '20px' }}
                 >
-                  {isProcessing ? 'Procesando...' : '✅ Confirmar Venta'}
+                  {isProcessing ? 'Procesando...' : 'Confirmar Venta'}
                 </button>
               </div>
             </>
