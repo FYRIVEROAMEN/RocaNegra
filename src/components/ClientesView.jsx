@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getClientesConDeuda, getClientes, registrarPagoDeuda, getVentasPendientesCliente, eliminarDeudaCliente, eliminarCliente } from '../services/api'
-import { Search, Trash2, Download, MoreVertical, Phone, Copy, Eye, UserX, ChevronUp } from 'lucide-react'
+import { Search, Trash2, Download, MoreVertical, Phone, Copy, Eye, UserX, ChevronUp, Wallet, MessageCircle } from 'lucide-react'
 import Swal from 'sweetalert2'
 
 function ClientesView() {
@@ -92,7 +92,7 @@ function ClientesView() {
         <input id="nota-pago" type="text" placeholder="Nota (opcional)" style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px;" />
       `,
       showCancelButton: true,
-      confirmButtonText: '💵 Registrar Pago',
+      confirmButtonText: 'Registrar Pago',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#10B981',
       cancelButtonColor: '#6B7280',
@@ -133,14 +133,14 @@ function ClientesView() {
   const handleEliminarDeuda = (cliente) => {
     setOpenMenu(null)
     Swal.fire({
-      title: '️ ¿Condonar deuda?',
+      title: '¿Condonar deuda?',
       html: `
         <p style="margin-bottom: 10px;">Se eliminará <strong>TODA</strong> la deuda de <strong>${cliente.nombre || cliente.telefono}</strong></p>
         <p style="color: #dc2626; font-size: 1.1rem; font-weight: bold;">$${Number(cliente.deuda_total).toFixed(2)}</p>
         <p style="color: #6b7280; font-size: 0.9rem; margin-top: 15px;">Esta acción no se puede deshacer. Usá esto solo para deudas huérfanas o condonadas.</p>
       `,
       showCancelButton: true,
-      confirmButtonText: '️ Sí, condonar',
+      confirmButtonText: 'Sí, condonar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
@@ -149,7 +149,7 @@ function ClientesView() {
       if (result.isConfirmed) {
         try {
           await eliminarDeudaCliente(cliente.id)
-          Swal.fire({ title: ' Deuda eliminada', text: `Se eliminó la deuda de $${Number(cliente.deuda_total).toFixed(2)}`, icon: 'success', timer: 2000 })
+          Swal.fire({ title: 'Deuda eliminada', text: `Se eliminó la deuda de $${Number(cliente.deuda_total).toFixed(2)}`, icon: 'success', timer: 2000 })
           fetchClientes()
           setExpandedClient(null)
         } catch (err) {
@@ -162,15 +162,15 @@ function ClientesView() {
   const handleEliminarCliente = (cliente) => {
     setOpenMenu(null)
     Swal.fire({
-      title: '🗑️ ¿Eliminar cliente?',
+      title: '¿Eliminar cliente?',
       html: `
         <p style="margin-bottom: 10px;">Se eliminará <strong>COMPLETAMENTE</strong> a <strong>${cliente.nombre || cliente.telefono}</strong> de la base de datos.</p>
-        <p style="color: #dc2626; font-size: 0.9rem; font-weight: bold;">️ Se desvincularán sus ventas y se borrarán sus pagos.</p>
+        <p style="color: #dc2626; font-size: 0.9rem; font-weight: bold;">Se desvincularán sus ventas y se borrarán sus pagos.</p>
         <p style="color: #6b7280; font-size: 0.9rem; margin-top: 15px;">Esta acción NO se puede deshacer.</p>
         <input id="confirmar-eliminar" type="text" placeholder='Escribí "ELIMINAR" para confirmar' style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px; margin-top: 15px;" />
       `,
       showCancelButton: true,
-      confirmButtonText: '🗑️ Sí, eliminar definitivamente',
+      confirmButtonText: 'Sí, eliminar definitivamente',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
@@ -187,7 +187,7 @@ function ClientesView() {
       if (result.isConfirmed) {
         try {
           await eliminarCliente(cliente.id)
-          Swal.fire({ title: ' Cliente eliminado', text: 'Se eliminó el cliente y todos sus datos asociados', icon: 'success', timer: 2000 })
+          Swal.fire({ title: 'Cliente eliminado', text: 'Se eliminó el cliente y todos sus datos asociados', icon: 'success', timer: 2000 })
           fetchClientes()
           setExpandedClient(null)
         } catch (err) {
@@ -201,7 +201,7 @@ function ClientesView() {
     navigator.clipboard.writeText(cliente.telefono)
     setOpenMenu(null)
     Swal.fire({
-      title: ' Teléfono copiado',
+      title: 'Teléfono copiado',
       text: cliente.telefono,
       icon: 'success',
       timer: 1500,
@@ -211,7 +211,7 @@ function ClientesView() {
 
   return (
     <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200 max-w-5xl mx-auto">
-      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">👥 Gestión de Clientes</h2>
+      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">Gestión de Clientes</h2>
 
       {/* Controles de Filtro y Exportación */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -222,7 +222,7 @@ function ClientesView() {
               filtro === 'deudores' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            ⚠️ Clientes Deudores
+            Clientes Deudores
           </button>
           <button
             onClick={() => setFiltro('todos')}
@@ -230,7 +230,7 @@ function ClientesView() {
               filtro === 'todos' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            👥 Todos los Clientes
+            Todos los Clientes
           </button>
         </div>
         
@@ -270,7 +270,7 @@ function ClientesView() {
         <div className="text-center py-8 text-gray-500">Cargando...</div>
       ) : filteredClientes.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          <p className="text-xl"> {filtro === 'deudores' ? 'No hay clientes con deuda' : 'No hay clientes registrados'}</p>
+          <p className="text-xl">{filtro === 'deudores' ? 'No hay clientes con deuda' : 'No hay clientes registrados'}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -280,142 +280,140 @@ function ClientesView() {
             return (
               <div key={cliente.id} className="bg-white rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:shadow-lg overflow-visible">
                 {/* Header del cliente */}
-                <div className="p-5 bg-gradient-to-br from-gray-50 to-white">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-white">
+                  <div className="flex justify-between items-start mb-3">
+                    {/* Info del cliente con truncate para que no empuje nada */}
+                    <div className="flex-1 min-w-0 pr-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xl font-bold text-gray-900 uppercase tracking-wide">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                           {cliente.nombre || 'Sin nombre'}
                         </h3>
                         {!tieneDeuda && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                             Al día
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold whitespace-nowrap">
+                            Al día
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Phone className="w-4 h-4 text-gray-500" />
-                        <p className="text-sm text-gray-600 font-medium">{cliente.telefono}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Phone className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                        <p className="text-sm text-gray-600 font-medium truncate">{cliente.telefono}</p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        📅 Última compra: {cliente.ultima_compra ? new Date(cliente.ultima_compra).toLocaleDateString('es-AR') : 'Nunca'}
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        Última compra: {cliente.ultima_compra ? new Date(cliente.ultima_compra).toLocaleDateString('es-AR') : 'Nunca'}
                       </p>
                     </div>
                     
-                    {/* Monto de deuda - Destacado */}
+                    {/* Monto de deuda - COMPACTO (no gigante) */}
                     {tieneDeuda && (
-                      <div className="text-right">
-                        <p className="text-3xl font-bold text-red-600">
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xl font-bold text-red-600 whitespace-nowrap">
                           ${Number(cliente.deuda_total).toFixed(2)}
                         </p>
-                        <p className="text-xs text-red-500 font-semibold uppercase tracking-wide">Pendiente</p>
+                        <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide">Pendiente</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Botón Principal - COBRAR (solo si tiene deuda) */}
-                  {tieneDeuda && (
-                    <button
-                      onClick={() => handleRegistrarPago(cliente)}
-                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:from-green-700 active:to-green-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] mb-3 flex items-center justify-center gap-2 text-lg"
-                      style={{ minHeight: '56px' }}
-                    >
-                      <span>💵</span>
-                      <span>COBRAR DEUDA</span>
-                    </button>
-                  )}
-
-                  {/* Acciones Secundarias */}
-                  <div className="flex gap-2">
+                  {/* Botones de acción - DISTRIBUCIÓN MATEMÁTICA PARA QUE NO SE CORTE */}
+                  <div className="flex gap-2 mt-3">
                     {tieneDeuda && (
-                      <button
-                        onClick={() => handleWhatsApp(cliente)}
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-2"
-                        style={{ minHeight: '48px' }}
-                      >
-                        <span>📱</span>
-                        <span>WhatsApp</span>
-                      </button>
+                      <>
+                        {/* Cobrar: ocupa un poco más de espacio (flex-1.5) */}
+                        <button
+                          onClick={() => handleRegistrarPago(cliente)}
+                          className="flex-[1.5] bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-2.5 px-2 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-1.5 text-sm"
+                          style={{ minHeight: '44px' }}
+                        >
+                          <Wallet className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">Cobrar</span>
+                        </button>
+                        
+                        {/* WhatsApp: ocupa espacio estándar (flex-1) */}
+                        <button
+                          onClick={() => handleWhatsApp(cliente)}
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold py-2.5 px-2 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-1.5 text-sm"
+                          style={{ minHeight: '44px' }}
+                        >
+                          <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">WhatsApp</span>
+                        </button>
+                      </>
                     )}
                     
-                    {/* Menú de Más Opciones */}
-<div className={`relative z-50 ${tieneDeuda ? 'flex-1' : 'w-full'}`}>
-  <button
-    onClick={() => setOpenMenu(openMenu === cliente.id ? null : cliente.id)}
-    className={`bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-semibold py-2.5 px-3 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-1.5 ${!tieneDeuda ? 'w-full' : ''}`}
-    style={{ minHeight: '44px' }}
-  >
-    <MoreVertical className="w-4 h-4" />
-    <span className="text-sm">Más opciones</span>
-  </button>
-  
-  {/* Menú Desplegable - HACIA ARRIBA */}
-  {openMenu === cliente.id && (
-    <>
-      {/* Overlay para cerrar al tocar fuera */}
-      <div 
-        className="fixed inset-0 z-[90]"
-        onClick={() => setOpenMenu(null)}
-      ></div>
-      
-      {/* Menú */}
-      <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden">
-        <button
-          onClick={() => { toggleExpand(cliente.id); setOpenMenu(null); }}
-          className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-blue-100"
-        >
-          <Eye className="w-4 h-4 text-blue-600 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-sm">Ver Detalle</p>
-            <p className="text-xs text-gray-500 truncate">Historial de compras</p>
-          </div>
-        </button>
-        <button
-          onClick={() => { handleCopiarTelefono(cliente); setOpenMenu(null); }}
-          className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-gray-100"
-        >
-          <Copy className="w-4 h-4 text-gray-600 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-sm">Copiar Teléfono</p>
-            <p className="text-xs text-gray-500 truncate">{cliente.telefono}</p>
-          </div>
-        </button>
-        {tieneDeuda && (
-          <button
-            onClick={() => { handleEliminarDeuda(cliente); setOpenMenu(null); }}
-            className="w-full text-left px-4 py-3 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-orange-100"
-          >
-            <Trash2 className="w-4 h-4 text-orange-600 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm">Condonar Deuda</p>
-              <p className="text-xs text-orange-500 truncate">Eliminar ${Number(cliente.deuda_total).toFixed(2)}</p>
-            </div>
-          </button>
-        )}
-        <button
-          onClick={() => { handleEliminarCliente(cliente); setOpenMenu(null); }}
-          className="w-full text-left px-4 py-3 text-sm text-red-700 hover:bg-red-50 flex items-center gap-3 transition active:bg-red-100"
-        >
-          <UserX className="w-4 h-4 text-red-600 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-sm">Eliminar Cliente</p>
-            <p className="text-xs text-red-500 truncate">Borrar de la base</p>
-          </div>
-        </button>
-      </div>
-    </>
-  )}
-</div>
+                    {/* Menú de Más Opciones: ANCHO FIJO (44px) para que NUNCA se corte */}
+                    <div className={`relative ${tieneDeuda ? 'w-11' : 'w-full'}`}>
+                      <button
+                        onClick={() => setOpenMenu(openMenu === cliente.id ? null : cliente.id)}
+                        className={`bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-semibold rounded-lg shadow transition-all duration-200 flex items-center justify-center ${!tieneDeuda ? 'w-full py-2.5 gap-2' : 'w-11 h-11'}`}
+                      >
+                        <MoreVertical className="w-5 h-5 flex-shrink-0" />
+                        {!tieneDeuda && <span className="text-sm">Más opciones</span>}
+                      </button>
+                      
+                      {/* Menú Desplegable - HACIA ARRIBA */}
+                      {openMenu === cliente.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-[90]"
+                            onClick={() => setOpenMenu(null)}
+                          ></div>
+                          
+                          <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden">
+                            <button
+                              onClick={() => { toggleExpand(cliente.id); setOpenMenu(null); }}
+                              className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-blue-100"
+                            >
+                              <Eye className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm">Ver Detalle</p>
+                                <p className="text-xs text-gray-500 truncate">Historial de compras</p>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => { handleCopiarTelefono(cliente); setOpenMenu(null); }}
+                              className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-gray-100"
+                            >
+                              <Copy className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm">Copiar Teléfono</p>
+                                <p className="text-xs text-gray-500 truncate">{cliente.telefono}</p>
+                              </div>
+                            </button>
+                            {tieneDeuda && (
+                              <button
+                                onClick={() => { handleEliminarDeuda(cliente); setOpenMenu(null); }}
+                                className="w-full text-left px-4 py-3 text-sm text-orange-700 hover:bg-orange-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-orange-100"
+                              >
+                                <Trash2 className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-sm">Condonar Deuda</p>
+                                  <p className="text-xs text-orange-500 truncate">Eliminar ${Number(cliente.deuda_total).toFixed(2)}</p>
+                                </div>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => { handleEliminarCliente(cliente); setOpenMenu(null); }}
+                              className="w-full text-left px-4 py-3 text-sm text-red-700 hover:bg-red-50 flex items-center gap-3 transition active:bg-red-100"
+                            >
+                              <UserX className="w-4 h-4 text-red-600 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm">Eliminar Cliente</p>
+                                <p className="text-xs text-red-500 truncate">Borrar de la base</p>
+                              </div>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Detalle de ventas pendientes (expandible) CON BOTÓN DE CERRAR */}
+                {/* Detalle de ventas pendientes (expandible) */}
                 {expandedClient === cliente.id && (
                   <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    {/* Header con botón de cerrar */}
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="font-bold text-gray-700 flex items-center gap-2 text-sm sm:text-base">
-                        📋 Historial de compras pendientes:
+                        Historial de compras pendientes:
                       </h4>
                       <button
                         onClick={() => setExpandedClient(null)}
@@ -443,7 +441,7 @@ function ClientesView() {
                             
                             {venta.productos.length > 0 && (
                               <div className="p-3 bg-gray-100 border-t border-gray-200">
-                                <p className="text-xs font-semibold text-gray-600 mb-2">📦 Productos:</p>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Productos:</p>
                                 <div className="space-y-1">
                                   {venta.productos.map((prod, idx) => (
                                     <p key={idx} className="text-xs text-gray-700 flex justify-between items-center">
@@ -464,7 +462,7 @@ function ClientesView() {
                                 {venta.pagos.length === 1 ? (
                                   <div className="flex justify-between items-center">
                                     <div>
-                                      <p className="text-xs font-semibold text-green-700"> Pagado:</p>
+                                      <p className="text-xs font-semibold text-green-700">Pagado:</p>
                                       <p className="text-xs text-green-700">
                                         {new Date(venta.pagos[0].fecha).toLocaleDateString('es-AR')}
                                         {venta.pagos[0].nota && ` - ${venta.pagos[0].nota}`}
@@ -474,7 +472,7 @@ function ClientesView() {
                                   </div>
                                 ) : (
                                   <div>
-                                    <p className="text-xs font-semibold text-green-700 mb-2"> Pagos realizados:</p>
+                                    <p className="text-xs font-semibold text-green-700 mb-2">Pagos realizados:</p>
                                     {venta.pagos.map((pago, idx) => (
                                       <div key={idx} className="flex justify-between items-center text-sm mb-1">
                                         <span className="text-green-700">
@@ -495,7 +493,7 @@ function ClientesView() {
                             
                             <div className="p-3 bg-red-50 border-t border-red-200 flex justify-between items-center">
                               <div>
-                                <span className="font-semibold text-red-800">⚠️ Pendiente:</span>
+                                <span className="font-semibold text-red-800">Pendiente:</span>
                                 <p className="text-xs text-red-600 mt-1">Resta pagar de ${Number(venta.total).toFixed(2)}</p>
                               </div>
                               <span className="text-xl font-bold text-red-700">${venta.pendiente.toFixed(2)}</span>
@@ -505,7 +503,7 @@ function ClientesView() {
                       </div>
                     ) : (
                       <div className="text-center py-6 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-sm text-green-700"> Este cliente no tiene compras pendientes</p>
+                        <p className="text-sm text-green-700">Este cliente no tiene compras pendientes</p>
                       </div>
                     )}
                   </div>
