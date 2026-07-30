@@ -133,14 +133,14 @@ function ClientesView() {
   const handleEliminarDeuda = (cliente) => {
     setOpenMenu(null)
     Swal.fire({
-      title: '¿Condonar deuda?',
+      title: '¿Perdonar deuda?',
       html: `
         <p style="margin-bottom: 10px;">Se eliminará <strong>TODA</strong> la deuda de <strong>${cliente.nombre || cliente.telefono}</strong></p>
         <p style="color: #dc2626; font-size: 1.1rem; font-weight: bold;">$${Number(cliente.deuda_total).toFixed(2)}</p>
         <p style="color: #6b7280; font-size: 0.9rem; margin-top: 15px;">Esta acción no se puede deshacer. Usá esto solo para deudas huérfanas o condonadas.</p>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Sí, condonar',
+      confirmButtonText: 'Sí, perdonar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
@@ -281,76 +281,23 @@ function ClientesView() {
               <div key={cliente.id} className="bg-white rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:shadow-lg overflow-visible">
                 {/* Header del cliente */}
                 <div className="p-4 bg-gradient-to-br from-gray-50 to-white">
-                  <div className="flex justify-between items-start mb-3">
-                    {/* Info del cliente con truncate para que no empuje nada */}
-                    <div className="flex-1 min-w-0 pr-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                          {cliente.nombre || 'Sin nombre'}
-                        </h3>
-                        {!tieneDeuda && (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold whitespace-nowrap">
-                            Al día
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Phone className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                        <p className="text-sm text-gray-600 font-medium truncate">{cliente.telefono}</p>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 truncate">
-                        Última compra: {cliente.ultima_compra ? new Date(cliente.ultima_compra).toLocaleDateString('es-AR') : 'Nunca'}
-                      </p>
-                    </div>
+                  
+                  {/* FILA SUPERIOR: Nombre + Menú (3 puntos) */}
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-base font-bold text-gray-900 truncate flex-1 pr-2">
+                      {cliente.nombre || 'Sin nombre'}
+                    </h3>
                     
-                    {/* Monto de deuda - COMPACTO (no gigante) */}
-                    {tieneDeuda && (
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xl font-bold text-red-600 whitespace-nowrap">
-                          ${Number(cliente.deuda_total).toFixed(2)}
-                        </p>
-                        <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wide">Pendiente</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Botones de acción - DISTRIBUCIÓN MATEMÁTICA PARA QUE NO SE CORTE */}
-                  <div className="flex gap-2 mt-3">
-                    {tieneDeuda && (
-                      <>
-                        {/* Cobrar: ocupa un poco más de espacio (flex-1.5) */}
-                        <button
-                          onClick={() => handleRegistrarPago(cliente)}
-                          className="flex-[1.5] bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-2.5 px-2 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-1.5 text-sm"
-                          style={{ minHeight: '44px' }}
-                        >
-                          <Wallet className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">Cobrar</span>
-                        </button>
-                        
-                        {/* WhatsApp: ocupa espacio estándar (flex-1) */}
-                        <button
-                          onClick={() => handleWhatsApp(cliente)}
-                          className="flex-1 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold py-2.5 px-2 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-1.5 text-sm"
-                          style={{ minHeight: '44px' }}
-                        >
-                          <MessageCircle className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">WhatsApp</span>
-                        </button>
-                      </>
-                    )}
-                    
-                    {/* Menú de Más Opciones: ANCHO FIJO (44px) para que NUNCA se corte */}
-                    <div className={`relative ${tieneDeuda ? 'w-11' : 'w-full'}`}>
+                    {/* Menú de 3 puntos - SIEMPRE VISIBLE ARRIBA */}
+                    <div className="relative z-50">
                       <button
                         onClick={() => setOpenMenu(openMenu === cliente.id ? null : cliente.id)}
-                        className={`bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-semibold rounded-lg shadow transition-all duration-200 flex items-center justify-center ${!tieneDeuda ? 'w-full py-2.5 gap-2' : 'w-11 h-11'}`}
+                        className="bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-lg p-2 transition"
                       >
-                        <MoreVertical className="w-5 h-5 flex-shrink-0" />
-                        {!tieneDeuda && <span className="text-sm">Más opciones</span>}
+                        <MoreVertical className="w-5 h-5" />
                       </button>
                       
-                      {/* Menú Desplegable - HACIA ARRIBA */}
+                      {/* Menú Desplegable */}
                       {openMenu === cliente.id && (
                         <>
                           <div 
@@ -358,7 +305,7 @@ function ClientesView() {
                             onClick={() => setOpenMenu(null)}
                           ></div>
                           
-                          <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden">
+                          <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden">
                             <button
                               onClick={() => { toggleExpand(cliente.id); setOpenMenu(null); }}
                               className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-blue-100"
@@ -386,7 +333,7 @@ function ClientesView() {
                               >
                                 <Trash2 className="w-4 h-4 text-orange-600 flex-shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-sm">Condonar Deuda</p>
+                                  <p className="font-semibold text-sm">Perdonar Deuda</p>
                                   <p className="text-xs text-orange-500 truncate">Eliminar ${Number(cliente.deuda_total).toFixed(2)}</p>
                                 </div>
                               </button>
@@ -406,6 +353,64 @@ function ClientesView() {
                       )}
                     </div>
                   </div>
+
+                  {/* FILA 2: Teléfono + Badge de estado */}
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Phone className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                      <p className="text-sm text-gray-600 font-medium truncate">{cliente.telefono}</p>
+                    </div>
+                    
+                    {tieneDeuda ? (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold whitespace-nowrap">
+                        Pendiente
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-md text-xs font-bold whitespace-nowrap">
+                        Al día
+                      </span>
+                    )}
+                  </div>
+
+                  {/* FILA 3: Última compra (sin monto grande) */}
+                  <p className="text-xs text-gray-500 mb-3">
+                    Última compra: {cliente.ultima_compra ? new Date(cliente.ultima_compra).toLocaleDateString('es-AR') : 'Nunca'}
+                  </p>
+
+                  {/* FILA 4: Botones de acción (SOLO 2 BOTONES) */}
+                  {tieneDeuda && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRegistrarPago(cliente)}
+                        className="flex-1 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold py-2.5 px-3 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                        style={{ minHeight: '44px' }}
+                      >
+                        <Wallet className="w-4 h-4 flex-shrink-0" />
+                        <span>Cobrar</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleWhatsApp(cliente)}
+                        className="flex-1 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold py-2.5 px-3 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                        style={{ minHeight: '44px' }}
+                      >
+                        <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>WhatsApp</span>
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Si no tiene deuda, solo mostramos el botón de WhatsApp */}
+                  {!tieneDeuda && (
+                    <button
+                      onClick={() => handleWhatsApp(cliente)}
+                      className="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold py-2.5 px-3 rounded-lg shadow transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                      style={{ minHeight: '44px' }}
+                    >
+                      <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>Contactar</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Detalle de ventas pendientes (expandible) */}
