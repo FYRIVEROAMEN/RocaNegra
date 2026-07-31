@@ -8,18 +8,16 @@ import Swal from 'sweetalert2'
 // ====================================================================
 const formatWhatsAppNumber = (phone) => {
   if (!phone) return ''
-  let clean = phone.replace(/\D/g, '') // Elimina todo lo que no sea número
+  let clean = phone.replace(/\D/g, '') 
   
-  if (clean.startsWith('549')) return clean // Ya está formateado
-  if (clean.startsWith('0')) clean = clean.slice(1) // Quita el 0 inicial
-  if (clean.startsWith('9')) clean = clean.slice(1) // Quita el 9 si lo ponen de más
+  if (clean.startsWith('549')) return clean 
+  if (clean.startsWith('0')) clean = clean.slice(1) 
+  if (clean.startsWith('9')) clean = clean.slice(1) 
   
-  // Si empieza con 15, le falta el código de área. Asumimos 11 (CABA/GBA) como default.
   if (clean.startsWith('15')) {
     clean = '11' + clean 
   }
   
-  // Quita el '15' si está después del código de área (11, 2xx, 3xx)
   clean = clean.replace(/^(11|2\d{2}|3\d{2})15/, '$1')
   
   return `549${clean}`
@@ -32,7 +30,6 @@ function SalesHistory() {
   const [showDetail, setShowDetail] = useState(false)
   const [selectedVenta, setSelectedVenta] = useState(null)
   
-  // ✅ NUEVO: Estados para selección múltiple
   const [selectedVentas, setSelectedVentas] = useState([])
   const [selectAll, setSelectAll] = useState(false)
 
@@ -47,7 +44,9 @@ function SalesHistory() {
       const ventasAdaptadas = (ventasData || []).map(venta => {
         const pagos = venta.pagos || []
         const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto || 0), 0)
-        const totalPendiente = Number(venta.total || 0) - totalPagado
+        // ✅ USAR total_neto (con fallback a total_bruto por si hay datos viejos)
+        const totalVenta = Number(venta.total_neto || venta.total_bruto || 0)
+        const totalPendiente = totalVenta - totalPagado
         
         return {
           ...venta,
@@ -100,6 +99,9 @@ function SalesHistory() {
     }
 
     const fecha = new Date(venta.fecha).toLocaleString('es-AR')
+    // ✅ FIX NaN: Usar total_neto
+    const montoTotal = Number(venta.total_neto || venta.total_bruto || 0)
+    
     let mensaje = `*COMPROBANTE DE VENTA* \n`
     mensaje += `━━━━━━━━━━━━━━━━━━━━\n`
     mensaje += ` ${fecha}\n`
@@ -116,7 +118,7 @@ function SalesHistory() {
     }
     
     mensaje += `\n━━━━━━━━━━━━━━━━━━━━\n`
-    mensaje += `*TOTAL: $${Number(venta.total).toFixed(2)}*\n`
+    mensaje += `*TOTAL: $${montoTotal.toFixed(2)}*\n`
     
     if (venta.estado_pago === 'parcial') {
       mensaje += `*Pagado: $${Number(venta.total_pagado || 0).toFixed(2)}*\n`
@@ -131,17 +133,21 @@ function SalesHistory() {
   }
 
   const exportarVentasCSV = () => {
-    const headers = ['ID Venta', 'Fecha', 'Cliente', 'Teléfono', 'Total', 'Estado Pago', 'Pagado', 'Pendiente']
-    const rows = ventasFiltradas.map(v => [
-      v.id,
-      new Date(v.fecha).toLocaleString('es-AR'),
-      v.cliente_nombre || 'Sin nombre',
-      v.cliente_telefono || 'Sin teléfono',
-      Number(v.total).toFixed(2),
-      v.estado_pago || 'pagado',
-      Number(v.total_pagado || 0).toFixed(2),
-      Number(v.total_pendiente || 0).toFixed(2)
-    ].map(cell => `"${cell}"`).join(','))
+    const headers = ['ID Venta', 'Fecha', 'Cliente', 'Teléfono', 'Total Neto', 'Estado Pago', 'Pagado', 'Pendiente']
+    const rows = ventasFiltradas.map(v => {
+      // ✅ FIX NaN: Usar total_neto
+      const totalNeto = Number(v.total_neto || v.total_bruto || 0)
+      return [
+        v.id,
+        new Date(v.fecha).toLocaleString('es-AR'),
+        v.cliente_nombre || 'Sin nombre',
+        v.cliente_telefono || 'Sin teléfono',
+        totalNeto.toFixed(2),
+        v.estado_pago || 'pagado',
+        Number(v.total_pagado || 0).toFixed(2),
+        Number(v.total_pendiente || 0).toFixed(2)
+      ].map(cell => `"${cell}"`).join(',')
+    })
 
     const csvContent = [headers.join(','), ...rows].join('\n')
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -151,7 +157,6 @@ function SalesHistory() {
     link.click()
   }
 
-  // ✅ NUEVO: Toggle selección individual
   const toggleSelectVenta = (ventaId, estadoPago) => {
     if (estadoPago !== 'pagado') {
       Swal.fire({
@@ -170,7 +175,6 @@ function SalesHistory() {
     )
   }
 
-  // ✅ NUEVO: Toggle selección masiva
   const toggleSelectAll = () => {
     if (selectAll) {
       setSelectedVentas([])
@@ -183,7 +187,6 @@ function SalesHistory() {
     setSelectAll(!selectAll)
   }
 
-  // ✅ NUEVO: Eliminar ventas seleccionadas
   const eliminarSeleccionadas = async () => {
     if (selectedVentas.length === 0) {
       Swal.fire({
@@ -243,7 +246,11 @@ function SalesHistory() {
     return true
   })
 
-  const totalVentas = ventasFiltradas.reduce((sum, v) => sum + Number(v.total || 0), 0)
+  const totalVentas = ventasFiltradas.reduce((sum, v) => {
+    // ✅ FIX NaN: Usar total_neto
+    const monto = Number(v.total_neto || v.total_bruto || 0)
+    return sum + monto
+  }, 0)
 
   const getEstadoBadge = (estado) => {
     switch (estado) {
@@ -320,7 +327,7 @@ function SalesHistory() {
       {/* Resumen */}
       <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-6">
         <p className="text-lg text-gray-700">Total de ventas en el período:</p>
-        <p className="text-3xl font-bold text-blue-700">${totalVentas.toFixed(2)}</p>
+        <p className="text-lg sm:text-2xl font-bold text-green-700">${Number(totalVentas).toFixed(2)}</p>
         <p className="text-base text-gray-600 mt-1">{ventasFiltradas.length} transacción(es)</p>
       </div>
 
@@ -340,7 +347,6 @@ function SalesHistory() {
               <div key={venta.id} className="border-2 border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition">
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* CHECKBOX DE SELECCIÓN */}
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -370,7 +376,10 @@ function SalesHistory() {
                   </div>
 
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <p className="text-lg sm:text-2xl font-bold text-green-700">${Number(venta.total).toFixed(2)}</p>
+                    {/* ✅ FIX NaN: Usar total_neto */}
+                    <p className="text-lg sm:text-2xl font-bold text-green-700">
+                      ${Number(venta.total_neto || venta.total_bruto || 0).toFixed(2)}
+                    </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDelete(venta.id)}
@@ -402,7 +411,6 @@ function SalesHistory() {
               <button onClick={() => setShowDetail(false)} className="btn btn-secondary">Cerrar</button>
             </div>
             
-            {/* Información del cliente */}
             {selectedVenta.cliente_id && (
               <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4">
                 <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
@@ -452,7 +460,6 @@ function SalesHistory() {
               </div>
             )}
             
-            {/* Productos */}
             <div className="space-y-2">
               <h4 className="font-bold text-gray-700 flex items-center gap-2">
                 <Package className="w-5 h-5" /> Productos:
@@ -474,12 +481,12 @@ function SalesHistory() {
               ))}
             </div>
             
-            {/* Total */}
             <div className="mt-4 pt-4 border-t-2 border-gray-300">
               <div className="flex justify-between items-center">
                 <span className="text-xl font-bold text-gray-700">Total:</span>
+                {/* ✅ FIX NaN: Usar total_neto en el modal */}
                 <span className="text-3xl font-bold text-green-700">
-                  ${Number(selectedVenta.total).toFixed(2)}
+                  ${Number(selectedVenta.total_neto || selectedVenta.total_bruto || 0).toFixed(2)}
                 </span>
               </div>
             </div>

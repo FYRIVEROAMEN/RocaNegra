@@ -34,14 +34,19 @@ export const deactivateProducto = (id) => api.patch(`/productos?id=eq.${id}&loca
 export const reactivateProducto = (id) => api.patch(`/productos?id=eq.${id}&local_id=eq.${LOCAL_ID}`, { activo: true })
 
 // ==========================================
-// VENTAS
+// VENTAS (ACTUALIZADO CON DESCUENTOS)
 // ==========================================
-export const createVenta = (data) => api.post('/ventas', { ...data, local_id: LOCAL_ID })
+export const createVenta = (data) => api.post('/ventas', { 
+  ...data, 
+  local_id: LOCAL_ID,
+  // Aseguramos que total_neto se calcule correctamente si viene desde el frontend
+  total_neto: data.total_neto !== undefined ? data.total_neto : (data.total_bruto || 0) - (data.descuento_monto || 0)
+})
+
 export const createDetalleVenta = (data) => api.post('/detalle_ventas', { ...data, local_id: LOCAL_ID })
 
-// Obtener historial con detalles y cliente
-export const getVentas = () => api.get(`/ventas?local_id=eq.${LOCAL_ID}&select=id,fecha,total,estado_pago,cliente_id,clientes(id,nombre,telefono),detalle_ventas(cantidad,precio_unitario,productos(nombre,talle,color)),pagos(monto)&order=fecha.desc`)
-
+// ✅ ACTUALIZADO: Selecciona los nuevos campos de descuento y total_neto
+export const getVentas = () => api.get(`/ventas?local_id=eq.${LOCAL_ID}&select=id,fecha,total_bruto,descuento_monto,descuento_motivo,total_neto,estado_pago,cliente_id,clientes(id,nombre,telefono),detalle_ventas(cantidad,precio_unitario,productos(nombre,talle,color)),pagos(monto)&order=fecha.desc`)
 export const deleteDetalleVenta = (ventaId) => api.delete(`/detalle_ventas?venta_id=eq.${ventaId}&local_id=eq.${LOCAL_ID}`)
 export const deleteVenta = (id) => api.delete(`/ventas?id=eq.${id}&local_id=eq.${LOCAL_ID}`)
 
@@ -56,7 +61,7 @@ export const crearOActualizarCliente = async (telefono, nombre, localId, montoVe
       p_telefono: telefono,
       p_nombre: nombre || null,
       p_local_id: localId,
-      p_monto_venta: montoVenta
+      p_monto_venta: montoVenta // Este ahora recibe el total_neto
     })
   
   if (error) throw error
@@ -117,10 +122,10 @@ export const getPagosPorCliente = async (clienteId) => {
 
 // Registrar nuevo pago a un cliente (para saldar deuda)
 export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null) => {
-  // 1. Obtener las ventas pendientes del cliente
+  // ✅ ACTUALIZADO: Usamos total_neto en lugar de total
   const { data: ventasPendientes, error: errorVentas } = await supabase
     .from('ventas')
-    .select('id, total, estado_pago')
+    .select('id, total_neto, estado_pago')
     .eq('cliente_id', clienteId)
     .in('estado_pago', ['parcial', 'pendiente'])
     .order('fecha', { ascending: true })
@@ -141,7 +146,8 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
       .eq('venta_id', venta.id)
     
     const totalPagado = pagosExistentes.reduce((sum, p) => sum + Number(p.monto), 0)
-    const deudaVenta = Number(venta.total) - totalPagado
+    // ✅ ACTUALIZADO: La deuda se calcula sobre el total_neto
+    const deudaVenta = Number(venta.total_neto) - totalPagado
     
     const montoAPagar = Math.min(montoRestante, deudaVenta)
     
@@ -164,7 +170,7 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
     
     // Actualizar estado de la venta
     const nuevoTotalPagado = totalPagado + montoAPagar
-    if (nuevoTotalPagado >= Number(venta.total)) {
+    if (nuevoTotalPagado >= Number(venta.total_neto)) {
       await supabase
         .from('ventas')
         .update({ estado_pago: 'pagado' })
@@ -178,7 +184,6 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
   }
   
   // ✅ FIX: Actualizar los totales del cliente en la tabla `clientes`
-  // Recalcular total_pagado sumando todos los pagos
   const { data: todosLosPagos } = await supabase
     .from('pagos')
     .select('monto')
@@ -186,7 +191,6 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
   
   const totalPagadoActualizado = (todosLosPagos || []).reduce((sum, p) => sum + Number(p.monto), 0)
   
-  // Obtener el total_compras del cliente
   const { data: clienteData } = await supabase
     .from('clientes')
     .select('total_compras')
@@ -196,7 +200,6 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
   const totalCompras = Number(clienteData?.total_compras || 0)
   const deudaActualizada = totalCompras - totalPagadoActualizado
   
-  // Actualizar la tabla clientes con los nuevos totales
   const { error: errorUpdateCliente } = await supabase
     .from('clientes')
     .update({
@@ -224,10 +227,10 @@ export const getClientes = async () => {
 
 // Obtener ventas pendientes de un cliente con detalle de pagos y productos
 export const getVentasPendientesCliente = async (clienteId) => {
-  // 1. Obtener todas las ventas del cliente
+  // ✅ ACTUALIZADO: Usamos total_neto
   const { data: ventas, error: errorVentas } = await supabase
     .from('ventas')
-    .select('id, fecha, total, estado_pago')
+    .select('id, fecha, total_neto, estado_pago')
     .eq('cliente_id', clienteId)
     .in('estado_pago', ['parcial', 'pendiente'])
     .order('fecha', { ascending: false })
@@ -251,7 +254,8 @@ export const getVentasPendientesCliente = async (clienteId) => {
         .eq('venta_id', venta.id)
       
       const totalPagado = (pagos || []).reduce((sum, p) => sum + Number(p.monto), 0)
-      const pendiente = Number(venta.total) - totalPagado
+      // ✅ ACTUALIZADO: Pendiente se calcula sobre total_neto
+      const pendiente = Number(venta.total_neto) - totalPagado
       
       return {
         ...venta,
@@ -290,7 +294,6 @@ export const eliminarCliente = async (clienteId) => {
       .eq('cliente_id', clienteId)
     
     // 2. Luego, desvincular las ventas (setear cliente_id a NULL)
-    // Esto es mejor que borrar las ventas porque mantenés el historial
     await supabase
       .from('ventas')
       .update({ cliente_id: null })

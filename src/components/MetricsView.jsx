@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Download, TrendingUp, Package, Users, AlertTriangle, ShoppingCart, DollarSign, ArrowRight } from 'lucide-react'
+import { Download, TrendingUp, Package, Users, AlertTriangle, ShoppingCart, DollarSign, ArrowRight, Tag } from 'lucide-react'
 import { getVentas, getProductosActivos, getClientesConDeuda } from '../services/api'
 import Swal from 'sweetalert2'
 
@@ -11,9 +11,9 @@ function MetricsView({ onNavigate }) {
     valorInventario: 0,
     deudaTotal: 0,
     totalVentas: 0,
+    totalDescuentos: 0, // ✅ NUEVO: Total de descuentos aplicados
     topProductos: [],
     topClientes: [],
-    ventasPorDia: [],
     stockBajo: []
   })
 
@@ -45,7 +45,12 @@ function MetricsView({ onNavigate }) {
         return fechaVenta >= primerDiaMes
       })
       
-      const totalVentasMes = ventasDelMes.reduce((sum, v) => sum + Number(v.total || 0), 0)
+      // ✅ USAR total_neto en lugar de total
+      const totalVentasMes = ventasDelMes.reduce((sum, v) => sum + Number(v.total_neto || v.total_bruto || 0), 0)
+      
+      // ✅ NUEVO: Calcular total de descuentos
+      const totalDescuentos = ventasDelMes.reduce((sum, v) => sum + Number(v.descuento_monto || 0), 0)
+      
       const ticketPromedio = ventasDelMes.length > 0 ? totalVentasMes / ventasDelMes.length : 0
       
       // 5. Calcular valor del inventario
@@ -73,17 +78,17 @@ function MetricsView({ onNavigate }) {
         .sort((a, b) => b.cantidad - a.cantidad)
         .slice(0, 5)
       
-            // 7. Top 5 clientes
+      // 7. Top 5 clientes
       const ventasPorCliente = {}
       ventasDelMes.forEach(venta => {
         if (venta.cliente_id) {
-          // ✅ FIX: La ruta correcta es venta.clientes?.telefono
           const clienteNombre = venta.clientes?.nombre || `Cliente ${venta.clientes?.telefono || 'Anónimo'}`
           if (!ventasPorCliente[clienteNombre]) {
             ventasPorCliente[clienteNombre] = { cantidad: 0, total: 0 }
           }
+          // ✅ USAR total_neto
           ventasPorCliente[clienteNombre].cantidad += 1
-          ventasPorCliente[clienteNombre].total += Number(venta.total || 0)
+          ventasPorCliente[clienteNombre].total += Number(venta.total_neto || venta.total_bruto || 0)
         }
       })
       
@@ -92,27 +97,7 @@ function MetricsView({ onNavigate }) {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5)
       
-      // 8. Ventas por día (últimos 7 días)
-      const ventasPorDiaMap = {}
-      for (let i = 6; i >= 0; i--) {
-        const fecha = new Date()
-        fecha.setDate(fecha.getDate() - i)
-        const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
-        ventasPorDiaMap[fechaStr] = 0
-      }
-      
-      ventasDelMes.forEach(venta => {
-        const fechaVenta = new Date(venta.fecha)
-        const diffDias = Math.floor((ahora - fechaVenta) / (1000 * 60 * 60 * 24))
-        if (diffDias <= 6 && diffDias >= 0) {
-          const fechaStr = fechaVenta.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
-          ventasPorDiaMap[fechaStr] = (ventasPorDiaMap[fechaStr] || 0) + Number(venta.total || 0)
-        }
-      })
-      
-      const ventasPorDia = Object.entries(ventasPorDiaMap).map(([fecha, total]) => ({ fecha, total }))
-      
-      // 9. Productos con stock bajo (≤5)
+      // 8. Productos con stock bajo (≤5)
       const stockBajo = productos
         .filter(p => p.stock <= 5)
         .sort((a, b) => a.stock - b.stock)
@@ -123,10 +108,10 @@ function MetricsView({ onNavigate }) {
         ticketPromedio,
         valorInventario,
         deudaTotal,
+        totalDescuentos, // ✅ NUEVO
         totalVentas: ventasDelMes.length,
         topProductos,
         topClientes,
-        ventasPorDia,
         stockBajo
       })
       
@@ -237,7 +222,17 @@ function MetricsView({ onNavigate }) {
           <p className="text-xs text-red-600 mt-1">por cobrar (Ver Clientes)</p>
         </button>
 
-        {/* Card 5: Resumen del Mes */}
+        {/* ✅ NUEVA Card 5: Descuentos Otorgados */}
+        <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-5 rounded-xl border border-pink-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-pink-700 font-medium">Descuentos Otorgados</p>
+            <Tag className="w-5 h-5 text-pink-600" />
+          </div>
+          <p className="text-3xl font-bold text-pink-900">${metrics.totalDescuentos.toFixed(2)}</p>
+          <p className="text-xs text-pink-600 mt-1">en promociones este mes</p>
+        </div>
+
+        {/* Card 6: Resumen del Mes */}
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 sm:col-span-2 lg:col-span-2">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-orange-700 font-medium">Resumen del Mes</p>
@@ -260,29 +255,7 @@ function MetricsView({ onNavigate }) {
         </div>
       </div>
 
-      {/* Ventas por Día (Gráfico simple de barras) */}
-      <div className="mb-8">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Ventas de los Últimos 7 Días</h3>
-        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-          <div className="flex items-end justify-between h-40 gap-2">
-            {metrics.ventasPorDia.map((dia, idx) => {
-              const maxVenta = Math.max(...metrics.ventasPorDia.map(d => d.total))
-              const altura = maxVenta > 0 ? (dia.total / maxVenta) * 100 : 0
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-2">
-                  <div 
-                    className="w-full bg-blue-500 rounded-t-lg transition-all duration-500 hover:bg-blue-600"
-                    style={{ height: `${Math.max(altura, 5)}%` }}
-                    title={`$${dia.total.toFixed(2)}`}
-                  ></div>
-                  <p className="text-xs text-gray-600 font-medium">{dia.fecha}</p>
-                  <p className="text-xs text-gray-500">${dia.total > 1000 ? `${(dia.total/1000).toFixed(1)}k` : dia.total.toFixed(0)}</p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      {/* ✅ SECCIÓN ELIMINADA: Ventas por Día (Gráfico de barras) */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Productos */}

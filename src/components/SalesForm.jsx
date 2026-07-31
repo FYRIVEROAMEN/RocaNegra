@@ -1,15 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Plus, Trash2, ShoppingCart, Minus, X, Barcode, User, Phone, DollarSign } from 'lucide-react'
-import { updateProducto, createVenta, createDetalleVenta, crearOActualizarCliente, registrarPago, actualizarEstadoPagoVenta } from '../services/api'
-import { createClient } from '@supabase/supabase-js'
+import { Search, Plus, Trash2, ShoppingCart, Minus, X, Barcode, User, Phone, DollarSign, Info, Percent, Tag } from 'lucide-react'
+import { 
+  updateProducto, 
+  createVenta, 
+  createDetalleVenta, 
+  crearOActualizarCliente, 
+  registrarPago, 
+  actualizarEstadoPagoVenta,
+  updateVentaCliente
+} from '../services/api'
 import Swal from 'sweetalert2'
 import { BrowserMultiFormatReader } from '@zxing/library'
 
-// Cliente Supabase para actualizar la venta con el cliente_id
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// Función utilitaria para formatear teléfonos argentinos para WhatsApp
+const formatWhatsAppNumber = (phone) => {
+  if (!phone) return ''
+  let clean = phone.replace(/\D/g, '')
+  if (clean.startsWith('549')) return clean
+  if (clean.startsWith('0')) clean = clean.slice(1)
+  if (clean.startsWith('9')) clean = clean.slice(1)
+  if (clean.startsWith('15')) clean = '11' + clean
+  clean = clean.replace(/^(11|2\d{2}|3\d{2})15/, '$1')
+  return `549${clean}`
+}
 
 function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -17,19 +30,18 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   
-  // 👇 NUEVOS ESTADOS PARA CLIENTE Y PAGO
   const [clienteTelefono, setClienteTelefono] = useState('')
   const [clienteNombre, setClienteNombre] = useState('')
   const [montoPagado, setMontoPagado] = useState(0)
   
+  // ✅ NUEVOS ESTADOS PARA DESCUENTOS
+  const [aplicarDescuento, setAplicarDescuento] = useState(false)
+  const [tipoDescuento, setTipoDescuento] = useState('porcentaje') // 'porcentaje' o 'monto'
+  const [valorDescuento, setValorDescuento] = useState(0)
+  const [motivoDescuento, setMotivoDescuento] = useState('Promoción')
+  
   const codeReaderRef = useRef(null)
   const isCancelledRef = useRef(false)
-
-  // Sincronizar monto pagado con el total del carrito
-  useEffect(() => {
-    const total = cart.reduce((sum, item) => sum + (item.precio * item.quantity), 0)
-    setMontoPagado(total)
-  }, [cart])
 
   useEffect(() => {
     if (searchTerm.trim() === '') { setFilteredProducts([]); return }
@@ -59,7 +71,11 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
         item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
       ))
     } else {
-      setCart([...cart, { ...product, quantity: 1 }])
+      const newCart = [...cart, { ...product, quantity: 1 }]
+      setCart(newCart)
+      if (cart.length === 0) {
+        setMontoPagado(product.precio)
+      }
     }
     setSearchTerm('')
     setFilteredProducts([])
@@ -75,10 +91,23 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
     setCart(cart.map(item => item.id === id ? { ...item, quantity: newQuantity } : item))
   }
 
-  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id))
+  const removeFromCart = (id) => {
+    const newCart = cart.filter(item => item.id !== id)
+    setCart(newCart)
+    if (newCart.length === 0) {
+      setMontoPagado(0)
+    }
+  }
   
-  const total = cart.reduce((sum, item) => sum + (item.precio * item.quantity), 0)
-  const resta = total - (Number(montoPagado) || 0)
+  // ✅ CÁLCULOS CON DESCUENTO
+  const totalBruto = cart.reduce((sum, item) => sum + (item.precio * item.quantity), 0)
+  const descuentoMonto = aplicarDescuento 
+    ? (tipoDescuento === 'porcentaje' 
+        ? totalBruto * (valorDescuento / 100) 
+        : valorDescuento)
+    : 0
+  const totalNeto = totalBruto - descuentoMonto
+  const resta = totalNeto - (Number(montoPagado) || 0)
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -86,7 +115,6 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
       return
     }
 
-    // 1. Validar teléfono (obligatorio para registrar cliente)
     if (!clienteTelefono.trim()) {
       Swal.fire({
         title: 'Teléfono requerido',
@@ -97,11 +125,10 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
       return
     }
 
-    // 2. Validar monto pagado
-    if (Number(montoPagado) < 0 || Number(montoPagado) > total) {
+    if (Number(montoPagado) < 0 || Number(montoPagado) > totalNeto) {
       Swal.fire({
         title: 'Monto inválido',
-        text: 'El monto pagado debe ser entre $0 y el total de la venta.',
+        text: `El monto pagado debe ser entre $0 y el total neto ($${totalNeto.toFixed(2)}).`,
         icon: 'warning',
         confirmButtonColor: '#dc2626'
       })
@@ -112,52 +139,53 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
     try {
       const LOCAL_ID = import.meta.env.VITE_LOCAL_ID || 1
 
-      // 3. Crear la venta
-      const { data: ventaData, error: ventaError } = await createVenta({ total, local_id: LOCAL_ID })
+      // 1. Crear la venta con los nuevos campos de descuento
+      const { data: ventaData, error: ventaError } = await createVenta({ 
+        total_bruto: totalBruto,
+        descuento_monto: descuentoMonto,
+        descuento_motivo: aplicarDescuento ? motivoDescuento : 'Sin descuento',
+        total_neto: totalNeto,
+        local_id: LOCAL_ID 
+      })
       if (ventaError) throw new Error(ventaError.message)
       const ventaId = ventaData[0].id
 
-      // 4. Crear los detalles y actualizar stock
+      // 2. Crear los detalles y actualizar stock
       for (const item of cart) {
         await createDetalleVenta({ venta_id: ventaId, producto_id: item.id, cantidad: item.quantity, precio_unitario: item.precio, local_id: LOCAL_ID })
         await updateProducto(item.id, { stock: item.stock - item.quantity })
       }
 
-      // 5. Crear o actualizar cliente (devuelve el cliente_id)
+      // 3. Crear o actualizar cliente
       const clienteId = await crearOActualizarCliente(
         clienteTelefono.trim(),
         clienteNombre.trim() || null,
         LOCAL_ID,
-        total
+        totalNeto // Usar total_neto para el total_compras del cliente
       )
 
-      // 6. Vincular el cliente a la venta
-      const { error: errorUpdateVenta } = await supabase
-        .from('ventas')
-        .update({ cliente_id: clienteId })
-        .eq('id', ventaId)
-      
-      if (errorUpdateVenta) throw errorUpdateVenta
+      // 4. Vincular el cliente a la venta
+      await updateVentaCliente(ventaId, clienteId)
 
-      // 7. Registrar el pago
+      // 5. Registrar el pago
       if (Number(montoPagado) > 0) {
         await registrarPago(ventaId, clienteId, Number(montoPagado), LOCAL_ID)
       }
 
-      // 8. Actualizar estado de pago de la venta
+      // 6. Actualizar estado de pago de la venta
       let estadoPago = 'pagado'
       if (Number(montoPagado) === 0) estadoPago = 'pendiente'
-      else if (Number(montoPagado) < total) estadoPago = 'parcial'
+      else if (Number(montoPagado) < totalNeto) estadoPago = 'parcial'
       
       await actualizarEstadoPagoVenta(ventaId, estadoPago)
 
-      // 9. Generar mensaje de WhatsApp
+      // 7. Generar mensaje de WhatsApp
       const fecha = new Date().toLocaleString('es-AR', { 
         day: '2-digit', month: '2-digit', year: 'numeric', 
         hour: '2-digit', minute: '2-digit' 
       })
 
-      let mensajeWhatsApp = `*COMPROBANTE DE VENTA* 🧾\n`
+      let mensajeWhatsApp = `*COMPROBANTE DE VENTA*\n`
       mensajeWhatsApp += `━━━━━━━━━━━━━━━━━━━━\n`
       mensajeWhatsApp += `📅 ${fecha}\n`
       mensajeWhatsApp += ` Venta #${ventaId}\n`
@@ -169,9 +197,15 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
         mensajeWhatsApp += `   $${subtotal}\n`
       })
       mensajeWhatsApp += `\n━━━━━━━━━━━━━━━━━━━━\n`
-      mensajeWhatsApp += `*TOTAL: $${total.toFixed(2)}*\n`
+      mensajeWhatsApp += `*Subtotal: $${totalBruto.toFixed(2)}*\n`
       
-      if (Number(montoPagado) < total) {
+      if (aplicarDescuento && descuentoMonto > 0) {
+        mensajeWhatsApp += `*Descuento (${motivoDescuento}): -$${descuentoMonto.toFixed(2)}*\n`
+      }
+      
+      mensajeWhatsApp += `*TOTAL: $${totalNeto.toFixed(2)}*\n`
+      
+      if (Number(montoPagado) < totalNeto) {
         mensajeWhatsApp += `*Pagado: $${Number(montoPagado).toFixed(2)}*\n`
         mensajeWhatsApp += `*Resta: $${resta.toFixed(2)}*\n`
       }
@@ -179,21 +213,23 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
       mensajeWhatsApp += `━━━━━━━━━━━━━━━━━━━━\n\n`
       mensajeWhatsApp += `🎁 *¡SORTEO DE FIN DE MES!* 🎁\n\n`
       mensajeWhatsApp += `Al agendarnos, participás AUTOMÁTICAMENTE\n`
-      mensajeWhatsApp += `por una REMERA / ZAPATILLAS / $5000\n`
+      mensajeWhatsApp += `Prenda a elección\n`
       mensajeWhatsApp += `📅 Sorteo: Último día del mes\n\n`
       mensajeWhatsApp += `*¿QUERÉS DOBLE CHANCE?*\n`
-      mensajeWhatsApp += `✅ Seguinos en Instagram\n`
+      mensajeWhatsApp += `✅ Seguinos en Instagram @Moon.importados \n`
       mensajeWhatsApp += `✅ Compartí este mensaje con un amigo\n\n`
       mensajeWhatsApp += `¡Gracias por tu compra! 🙌`
 
       const mensajeCodificado = encodeURIComponent(mensajeWhatsApp)
 
-      // 10. Mostrar resultado y enviar WhatsApp
+      // 8. Mostrar resultado y enviar WhatsApp
       const result = await Swal.fire({
         title: '¡Venta Registrada! ✅',
         html: `
           <div style="text-align: left; font-size: 1rem;">
-            <p style="margin: 10px 0;"><strong>Total:</strong> <span style="color: #16a34a; font-size: 1.5rem; font-weight: bold;">$${total.toFixed(2)}</span></p>
+            <p style="margin: 10px 0;"><strong>Subtotal:</strong> <span style="color: #6b7280; font-size: 1.2rem;">$${totalBruto.toFixed(2)}</span></p>
+            ${aplicarDescuento && descuentoMonto > 0 ? `<p style="margin: 10px 0;"><strong>Descuento (${motivoDescuento}):</strong> <span style="color: #dc2626; font-size: 1.2rem;">-$${descuentoMonto.toFixed(2)}</span></p>` : ''}
+            <p style="margin: 10px 0;"><strong>Total:</strong> <span style="color: #16a34a; font-size: 1.5rem; font-weight: bold;">$${totalNeto.toFixed(2)}</span></p>
             <p style="margin: 10px 0;"><strong>Pagado:</strong> <span style="color: #2563eb; font-size: 1.2rem;">$${Number(montoPagado).toFixed(2)}</span></p>
             ${resta > 0 ? `<p style="margin: 10px 0;"><strong>Resta:</strong> <span style="color: #dc2626; font-size: 1.2rem; font-weight: bold;">$${resta.toFixed(2)}</span></p>` : ''}
             <p style="margin: 10px 0;"><strong>Productos:</strong> ${cart.length}</p>
@@ -204,7 +240,7 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
             <input 
               id="swal-whatsapp-input" 
               type="text" 
-              placeholder="Ej: 5491123456789" 
+              placeholder="Ej: 11 1234 5678"
               style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 16px;"
               value="${clienteTelefono}"
             />
@@ -228,15 +264,18 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
       })
 
       if (result.isConfirmed && result.value) {
-        const url = `https://wa.me/${result.value}?text=${mensajeCodificado}`
+        const url = `https://wa.me/${formatWhatsAppNumber(result.value)}?text=${mensajeCodificado}`
         window.open(url, '_blank')
       }
       
-      // 11. Limpiar formulario
+      // 9. Limpiar formulario
       setCart([])
       setClienteTelefono('')
       setClienteNombre('')
       setMontoPagado(0)
+      setAplicarDescuento(false)
+      setValorDescuento(0)
+      setMotivoDescuento('Promoción')
       onSaleRecorded()
 
     } catch (err) {
@@ -315,7 +354,6 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
       
       if (!isCancelledRef.current) {
         let mensaje = 'Error al escanear. Intentá de nuevo.'
-        
         if (err.name === 'NotAllowedError') mensaje = 'Permiso de cámara denegado.'
         else if (err.name === 'NotFoundError') mensaje = 'No se encontró una cámara.'
         else if (err.name === 'NotReadableError') mensaje = 'La cámara está en uso.'
@@ -400,7 +438,7 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
           )}
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO + CLIENTE + PAGO */}
+        {/* COLUMNA DERECHA: CARRITO + CLIENTE + PAGO + DESCUENTO */}
         <div className="bg-gray-50 p-4 sm:p-6 rounded-xl border-2 border-gray-200 flex flex-col">
           <h3 className="text-xl font-bold text-gray-700 mb-3">2. Carrito de Venta</h3>
           
@@ -435,7 +473,7 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                 ))}
               </div>
 
-              {/* 👇 SECCIÓN CLIENTE */}
+              {/* SECCIÓN CLIENTE */}
               <div className="border-t-2 border-gray-300 pt-4 mt-4">
                 <h4 className="text-lg font-bold text-gray-700 mb-3 flex items-center gap-2">
                   <User className="w-5 h-5" /> Datos del Cliente
@@ -446,13 +484,15 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="tel"
-                      placeholder="Teléfono (ej: 1512345678)"
+                      placeholder="Ej: 11 1234 5678"
                       value={clienteTelefono}
                       onChange={(e) => setClienteTelefono(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 ml-1">ℹ️ Formato: 15XXXXXXXX (sin 0 ni 11)</p>
+                  <p className="text-xs text-gray-500 ml-1 flex items-center">
+                    <Info className="w-3 h-3 mr-1" /> Formato: sin 0 ni 15, ej: 11 1234 5678
+                  </p>
                   
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -467,7 +507,98 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                 </div>
               </div>
 
-              {/* 👇 SECCIÓN PAGO */}
+              {/* ✅ NUEVA SECCIÓN: DESCUENTOS */}
+              <div className="border-t-2 border-gray-300 pt-4 mt-4">
+                <h4 className="text-lg font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <Tag className="w-5 h-5" /> Descuentos y Promociones
+                </h4>
+                
+                <div className="space-y-3">
+                  {/* Switch para activar/desactivar descuento */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={aplicarDescuento}
+                      onChange={(e) => setAplicarDescuento(e.target.checked)}
+                      className="w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Aplicar descuento a esta venta</span>
+                  </label>
+
+                  {aplicarDescuento && (
+                    <>
+                      {/* Tipo de descuento */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setTipoDescuento('porcentaje')}
+                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition ${
+                            tipoDescuento === 'porcentaje' 
+                              ? 'bg-green-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          <Percent className="w-4 h-4 inline mr-1" /> Porcentaje (%)
+                        </button>
+                        <button
+                          onClick={() => setTipoDescuento('monto')}
+                          className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition ${
+                            tipoDescuento === 'monto' 
+                              ? 'bg-green-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          <DollarSign className="w-4 h-4 inline mr-1" /> Monto Fijo ($)
+                        </button>
+                      </div>
+
+                      {/* Input del valor */}
+                      <div className="relative">
+                        {tipoDescuento === 'porcentaje' ? (
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                        ) : (
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                        )}
+                        <input
+                          type="number"
+                          placeholder={tipoDescuento === 'porcentaje' ? 'Ej: 10' : 'Ej: 500'}
+                          value={valorDescuento}
+                          onChange={(e) => setValorDescuento(Number(e.target.value))}
+                          className={`w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500`}
+                          min="0"
+                          max={tipoDescuento === 'porcentaje' ? 100 : totalBruto}
+                          step={tipoDescuento === 'porcentaje' ? 1 : 0.01}
+                        />
+                      </div>
+
+                      {/* Motivo del descuento */}
+                      <select
+                        value={motivoDescuento}
+                        onChange={(e) => setMotivoDescuento(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        <option value="Promoción">Promoción del día</option>
+                        <option value="Cliente VIP">Cliente VIP/Frecuente</option>
+                        <option value="Pequeño defecto">Pequeño defecto</option>
+                        <option value="Cierre de caja">Cierre de caja</option>
+                        <option value="Cupón">Cupón de descuento</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+
+                      {/* Resumen del descuento */}
+                      {descuentoMonto > 0 && (
+                        <div className="bg-green-50 border-2 border-green-200 p-3 rounded-lg">
+                          <p className="text-sm text-green-700 font-semibold">
+                            Descuento aplicado: ${descuentoMonto.toFixed(2)}
+                            {tipoDescuento === 'porcentaje' && ` (${valorDescuento}%)`}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* SECCIÓN PAGO */}
               <div className="border-t-2 border-gray-300 pt-4 mt-4">
                 <h4 className="text-lg font-bold text-gray-700 mb-3 flex items-center gap-2">
                   <DollarSign className="w-5 h-5" /> Pago
@@ -475,8 +606,20 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Total:</span>
-                    <span className="font-bold text-lg text-green-700">${total.toFixed(2)}</span>
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-bold text-lg text-gray-700">${totalBruto.toFixed(2)}</span>
+                  </div>
+                  
+                  {aplicarDescuento && descuentoMonto > 0 && (
+                    <div className="flex justify-between text-sm bg-green-50 p-2 rounded-lg border border-green-200">
+                      <span className="text-green-700 font-semibold">Descuento:</span>
+                      <span className="font-bold text-green-700">-${descuentoMonto.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between text-sm bg-blue-50 p-2 rounded-lg border border-blue-200">
+                    <span className="text-blue-700 font-bold">Total a Pagar:</span>
+                    <span className="font-bold text-lg text-blue-700">${totalNeto.toFixed(2)}</span>
                   </div>
                   
                   <div className="relative">
@@ -488,7 +631,7 @@ function SalesForm({ onSaleRecorded, productos, cart, setCart }) {
                       onChange={(e) => setMontoPagado(e.target.value)}
                       className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       min="0"
-                      max={total}
+                      max={totalNeto}
                       step="0.01"
                     />
                   </div>
