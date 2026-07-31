@@ -73,11 +73,12 @@ function MetricsView({ onNavigate }) {
         .sort((a, b) => b.cantidad - a.cantidad)
         .slice(0, 5)
       
-      // 7. Top 5 clientes
+            // 7. Top 5 clientes
       const ventasPorCliente = {}
       ventasDelMes.forEach(venta => {
         if (venta.cliente_id) {
-          const clienteNombre = venta.clientes?.nombre || `Cliente ${venta.cliente_telefono || 'Anónimo'}`
+          // ✅ FIX: La ruta correcta es venta.clientes?.telefono
+          const clienteNombre = venta.clientes?.nombre || `Cliente ${venta.clientes?.telefono || 'Anónimo'}`
           if (!ventasPorCliente[clienteNombre]) {
             ventasPorCliente[clienteNombre] = { cantidad: 0, total: 0 }
           }

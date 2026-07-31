@@ -3,28 +3,38 @@ import { X, ChevronRight } from 'lucide-react'
 
 const TUTORIAL_STEPS = [
   {
-    title: '¡Bienvenido a Stock Mercadería! 👋',
-    text: 'Acá vas a gestionar todo tu inventario de forma simple.',
+    title: '¡Bienvenido a Stock Mercadería!',
+    text: 'Acá vas a gestionar todo tu inventario, ventas y clientes de forma simple.',
     target: null
   },
   {
-    title: 'Buscá productos 🔍',
-    text: 'Usá el buscador para encontrar productos por nombre, categoría o color.',
-    target: 'search-input'
+    title: 'Gestiona tu Inventario',
+    text: 'Usá el buscador para encontrar productos o agregá nuevos con foto, precio y stock.',
+    target: 'bottom-nav' // Apunta a la navegación para que se ubique
   },
   {
-    title: 'Agregá productos ➕',
-    text: 'Con foto, precio y stock. ¡Así de fácil!',
-    target: 'add-product-btn'
+    title: 'Registrá Ventas',
+    text: 'Buscá productos, escaneá códigos de barras y registrá pagos (totales o parciales).',
+    target: null
   },
   {
-    title: 'Navegá entre secciones ',
-    text: 'Abajo tenés: Inventario, Ventas e Historial.',
-    target: 'bottom-nav'
+    title: 'Revisá el Historial',
+    text: 'Consultá ventas pasadas, filtrá por estado de pago y reenviá comprobantes por WhatsApp.',
+    target: null
   },
   {
-    title: '¡Listo para empezar! 🚀',
-    text: 'Ya sabés lo básico. ¡A vender!',
+    title: 'Controlá Clientes y Deudas',
+    text: 'Desde el menú "Más" (abajo), gestioná los saldos pendientes y registrá pagos a cuenta.',
+    target: null
+  },
+  {
+    title: 'Analizá tus Métricas',
+    text: 'Revisá tus ventas del mes, productos más vendidos y el valor total de tu inventario.',
+    target: null
+  },
+  {
+    title: '¡Listo para empezar!',
+    text: 'Ya conocés las herramientas principales. ¡A vender!',
     target: null
   }
 ]

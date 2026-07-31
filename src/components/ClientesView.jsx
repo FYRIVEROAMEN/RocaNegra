@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getClientesConDeuda, getClientes, registrarPagoDeuda, getVentasPendientesCliente, eliminarDeudaCliente, eliminarCliente } from '../services/api'
-import { Search, Trash2, Download, MoreVertical, Phone, Copy, Eye, UserX, ChevronUp, Wallet, MessageCircle } from 'lucide-react'
+import { getClientesConDeuda, getClientes, registrarPagoDeuda, getVentasPendientesCliente, eliminarDeudaCliente, eliminarCliente, updateCliente } from '../services/api'
+import { Search, Trash2, Download, MoreVertical, Phone, Copy, Eye, UserX, ChevronUp, Wallet, MessageCircle, Edit2 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
 function ClientesView() {
@@ -208,6 +208,63 @@ function ClientesView() {
       showConfirmButton: false
     })
   }
+    const handleEditarCliente = (cliente) => {
+    setOpenMenu(null)
+    
+    Swal.fire({
+      title: 'Editar Datos del Cliente',
+      html: `
+        <div style="text-align: left;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem;">Nombre</label>
+          <input id="edit-nombre" class="swal2-input" style="width: 100%; margin: 0;" value="${cliente.nombre || ''}" placeholder="Nombre y Apellido">
+          
+          <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; margin-top: 15px;">Teléfono</label>
+          <input id="edit-telefono" class="swal2-input" style="width: 100%; margin: 0;" value="${cliente.telefono || ''}" placeholder="Ej: 11 1234 5678">
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar Cambios',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#6b7280',
+      focusConfirm: false,
+      preConfirm: () => {
+        const nombre = document.getElementById('edit-nombre').value.trim()
+        const telefono = document.getElementById('edit-telefono').value.trim()
+        
+        if (!telefono) {
+          Swal.showValidationMessage('El teléfono es obligatorio')
+          return false
+        }
+        return { nombre, telefono }
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          await updateCliente(cliente.id, {
+            nombre: result.value.nombre || null,
+            telefono: result.value.telefono
+          })
+          
+          Swal.fire({
+            title: '¡Actualizado!',
+            text: 'Los datos del cliente se guardaron correctamente',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          })
+          
+          fetchClientes()
+          
+          if (expandedClient === cliente.id) {
+            fetchVentasDetalle(cliente.id)
+          }
+        } catch (err) {
+          Swal.fire({ title: 'Error', text: err.message, icon: 'error' })
+        }
+      }
+    })
+  }
 
   return (
     <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200 max-w-5xl mx-auto">
@@ -324,6 +381,18 @@ function ClientesView() {
                               <div className="min-w-0 flex-1">
                                 <p className="font-semibold text-sm">Copiar Teléfono</p>
                                 <p className="text-xs text-gray-500 truncate">{cliente.telefono}</p>
+                              </div>
+                              
+                            </button>
+                                                        {/* EDITAR DATOS DEL CLIENTE */}
+                            <button
+                              onClick={() => { handleEditarCliente(cliente); setOpenMenu(null); }}
+                              className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100 transition active:bg-blue-100"
+                            >
+                              <Edit2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm">Editar Datos</p>
+                                <p className="text-xs text-gray-500 truncate">Nombre o teléfono</p>
                               </div>
                             </button>
                             {tieneDeuda && (

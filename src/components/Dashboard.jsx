@@ -90,13 +90,25 @@ function Dashboard({ onLogout }) {
   }
 }
 
-  const handleReactivar = async (id) => {
+   const handleReactivar = async (id) => {
     try {
       await reactivateProducto(id)
       fetchProductosInactivos()
       fetchProductos()
+      Swal.fire({
+        title: 'Producto reactivado',
+        text: 'El producto volvió al inventario activo',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      })
     } catch (err) {
-      alert('Error al reactivar: ' + (err.response?.data?.message || err.message))
+      Swal.fire({
+        title: 'Error al reactivar',
+        text: err.response?.data?.message || err.message,
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      })
     }
   }
 

@@ -117,7 +117,7 @@ export const getPagosPorCliente = async (clienteId) => {
 
 // Registrar nuevo pago a un cliente (para saldar deuda)
 export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null) => {
-  // Primero obtenemos las ventas pendientes del cliente
+  // 1. Obtener las ventas pendientes del cliente
   const { data: ventasPendientes, error: errorVentas } = await supabase
     .from('ventas')
     .select('id, total, estado_pago')
@@ -130,7 +130,7 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
   let montoRestante = monto
   let pagosCreados = []
   
-  // Distribuir el pago entre las ventas pendientes (de más antigua a más nueva)
+  // 2. Distribuir el pago entre las ventas pendientes (FIFO)
   for (const venta of ventasPendientes) {
     if (montoRestante <= 0) break
     
@@ -162,7 +162,7 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
     
     montoRestante -= montoAPagar
     
-    // Si la venta quedó pagada, actualizar estado
+    // Actualizar estado de la venta
     const nuevoTotalPagado = totalPagado + montoAPagar
     if (nuevoTotalPagado >= Number(venta.total)) {
       await supabase
@@ -176,6 +176,36 @@ export const registrarPagoDeuda = async (clienteId, monto, localId, nota = null)
         .eq('id', venta.id)
     }
   }
+  
+  // ✅ FIX: Actualizar los totales del cliente en la tabla `clientes`
+  // Recalcular total_pagado sumando todos los pagos
+  const { data: todosLosPagos } = await supabase
+    .from('pagos')
+    .select('monto')
+    .eq('cliente_id', clienteId)
+  
+  const totalPagadoActualizado = (todosLosPagos || []).reduce((sum, p) => sum + Number(p.monto), 0)
+  
+  // Obtener el total_compras del cliente
+  const { data: clienteData } = await supabase
+    .from('clientes')
+    .select('total_compras')
+    .eq('id', clienteId)
+    .single()
+  
+  const totalCompras = Number(clienteData?.total_compras || 0)
+  const deudaActualizada = totalCompras - totalPagadoActualizado
+  
+  // Actualizar la tabla clientes con los nuevos totales
+  const { error: errorUpdateCliente } = await supabase
+    .from('clientes')
+    .update({
+      total_pagado: totalPagadoActualizado,
+      deuda_total: deudaActualizada
+    })
+    .eq('id', clienteId)
+  
+  if (errorUpdateCliente) throw errorUpdateCliente
   
   return pagosCreados
 }
@@ -277,6 +307,26 @@ export const eliminarCliente = async (clienteId) => {
     console.error('Error al eliminar cliente:', err)
     throw err
   }
+}
+
+// Actualizar el cliente_id de una venta ya creada
+export const updateVentaCliente = async (ventaId, clienteId) => {
+  const { error } = await supabase
+    .from('ventas')
+    .update({ cliente_id: clienteId })
+    .eq('id', ventaId)
+  
+  if (error) throw error
+}
+
+// Actualizar datos de un cliente (nombre y/o teléfono)
+export const updateCliente = async (clienteId, data) => {
+  const { error } = await supabase
+    .from('clientes')
+    .update(data)
+    .eq('id', clienteId)
+  
+  if (error) throw error
 }
 
 export default api

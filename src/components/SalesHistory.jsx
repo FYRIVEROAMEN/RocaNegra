@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react'
 import { getVentas, deleteVenta } from '../services/api'
-import { Download, Trash2, Filter, Eye, Phone } from 'lucide-react'
+import { Download, Trash2, Filter, User, Package } from 'lucide-react'
 import Swal from 'sweetalert2'
-import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+// ====================================================================
+// FUNCIÓN UTILITARIA: Formatea teléfonos argentinos para WhatsApp
+// ====================================================================
+const formatWhatsAppNumber = (phone) => {
+  if (!phone) return ''
+  let clean = phone.replace(/\D/g, '') // Elimina todo lo que no sea número
+  
+  if (clean.startsWith('549')) return clean // Ya está formateado
+  if (clean.startsWith('0')) clean = clean.slice(1) // Quita el 0 inicial
+  if (clean.startsWith('9')) clean = clean.slice(1) // Quita el 9 si lo ponen de más
+  
+  // Si empieza con 15, le falta el código de área. Asumimos 11 (CABA/GBA) como default.
+  if (clean.startsWith('15')) {
+    clean = '11' + clean 
+  }
+  
+  // Quita el '15' si está después del código de área (11, 2xx, 3xx)
+  clean = clean.replace(/^(11|2\d{2}|3\d{2})15/, '$1')
+  
+  return `549${clean}`
+}
 
 function SalesHistory() {
   const [ventas, setVentas] = useState([])
@@ -15,36 +31,39 @@ function SalesHistory() {
   const [filtro, setFiltro] = useState('todas')
   const [showDetail, setShowDetail] = useState(false)
   const [selectedVenta, setSelectedVenta] = useState(null)
+  
+  // ✅ NUEVO: Estados para selección múltiple
+  const [selectedVentas, setSelectedVentas] = useState([])
+  const [selectAll, setSelectAll] = useState(false)
 
   useEffect(() => {
     fetchVentas()
   }, [])
 
   const fetchVentas = async () => {
-  setLoading(true)
-  try {
-    const { data: ventasData } = await getVentas()
-    const ventasAdaptadas = (ventasData || []).map(venta => {
-      // Calcular total pagado sumando todos los pagos de esta venta
-      const pagos = venta.pagos || []
-      const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto || 0), 0)
-      const totalPendiente = Number(venta.total || 0) - totalPagado
-      
-      return {
-        ...venta,
-        detalle: venta.detalle_ventas || [],
-        cliente_nombre: venta.clientes?.nombre || null,
-        cliente_telefono: venta.clientes?.telefono || null,
-        total_pagado: totalPagado,
-        total_pendiente: totalPendiente
-      }
-    })
-    setVentas(ventasAdaptadas)
-  } catch (err) {
-    console.error('Error al cargar ventas:', err)
+    setLoading(true)
+    try {
+      const { data: ventasData } = await getVentas()
+      const ventasAdaptadas = (ventasData || []).map(venta => {
+        const pagos = venta.pagos || []
+        const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto || 0), 0)
+        const totalPendiente = Number(venta.total || 0) - totalPagado
+        
+        return {
+          ...venta,
+          detalle: venta.detalle_ventas || [],
+          cliente_nombre: venta.clientes?.nombre || null,
+          cliente_telefono: venta.clientes?.telefono || null,
+          total_pagado: totalPagado,
+          total_pendiente: totalPendiente
+        }
+      })
+      setVentas(ventasAdaptadas)
+    } catch (err) {
+      console.error('Error al cargar ventas:', err)
+    }
+    setLoading(false)
   }
-  setLoading(false)
-}
 
   const handleDelete = async (ventaId) => {
     const result = await Swal.fire({
@@ -81,7 +100,7 @@ function SalesHistory() {
     }
 
     const fecha = new Date(venta.fecha).toLocaleString('es-AR')
-    let mensaje = `*COMPROBANTE DE VENTA* 🧾\n`
+    let mensaje = `*COMPROBANTE DE VENTA* \n`
     mensaje += `━━━━━━━━━━━━━━━━━━━━\n`
     mensaje += ` ${fecha}\n`
     mensaje += ` Venta #${venta.id}\n`
@@ -107,7 +126,7 @@ function SalesHistory() {
     mensaje += `━━━━━━━━━━━━━━━━━━━━\n\n`
     mensaje += `¡Gracias por tu compra! `
     
-    const url = `https://wa.me/549${venta.cliente_telefono}?text=${encodeURIComponent(mensaje)}`
+    const url = `https://wa.me/${formatWhatsAppNumber(venta.cliente_telefono)}?text=${encodeURIComponent(mensaje)}`
     window.open(url, '_blank')
   }
 
@@ -132,38 +151,90 @@ function SalesHistory() {
     link.click()
   }
 
-  const limpiarHistorial = async (dias) => {
+  // ✅ NUEVO: Toggle selección individual
+  const toggleSelectVenta = (ventaId, estadoPago) => {
+    if (estadoPago !== 'pagado') {
+      Swal.fire({
+        title: 'No se puede seleccionar',
+        text: 'Solo se pueden eliminar ventas completamente pagadas',
+        icon: 'warning',
+        timer: 2000
+      })
+      return
+    }
+    
+    setSelectedVentas(prev => 
+      prev.includes(ventaId) 
+        ? prev.filter(id => id !== ventaId)
+        : [...prev, ventaId]
+    )
+  }
+
+  // ✅ NUEVO: Toggle selección masiva
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedVentas([])
+    } else {
+      const ventasPagadas = ventasFiltradas
+        .filter(v => v.estado_pago === 'pagado')
+        .map(v => v.id)
+      setSelectedVentas(ventasPagadas)
+    }
+    setSelectAll(!selectAll)
+  }
+
+  // ✅ NUEVO: Eliminar ventas seleccionadas
+  const eliminarSeleccionadas = async () => {
+    if (selectedVentas.length === 0) {
+      Swal.fire({
+        title: 'No hay ventas seleccionadas',
+        text: 'Seleccioná al menos una venta para eliminar',
+        icon: 'warning'
+      })
+      return
+    }
+
     const result = await Swal.fire({
-      title: `¿Eliminar ventas de más de ${dias} días?`,
-      text: 'Esta acción no se puede deshacer.',
+      title: `¿Eliminar ${selectedVentas.length} venta(s)?`,
+      html: `
+        <div style="text-align: left;">
+          <p style="margin-bottom: 10px;">Se eliminarán permanentemente:</p>
+          <ul style="margin-left: 20px; margin-bottom: 15px;">
+            <li>${selectedVentas.length} venta(s) seleccionada(s)</li>
+            <li>Sus productos/detalles asociados</li>
+          </ul>
+          <p style="color: #dc2626; font-weight: bold;">⚠️ Esta acción no se puede deshacer</p>
+        </div>
+      `,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+      confirmButtonText: 'Sí, eliminar seleccionadas',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
     })
 
     if (result.isConfirmed) {
       try {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - dias)
-        
-        const ventasAEliminar = ventas.filter(v => new Date(v.fecha) < cutoffDate)
-        
-        for (const venta of ventasAEliminar) {
-          await deleteVenta(venta.id)
+        for (const ventaId of selectedVentas) {
+          await deleteVenta(ventaId)
         }
         
-        Swal.fire({ title: 'Historial limpiado', icon: 'success', timer: 1500 })
+        Swal.fire({
+          title: 'Eliminadas',
+          text: `Se eliminaron ${selectedVentas.length} ventas`,
+          icon: 'success',
+          timer: 2000
+        })
+        
+        setSelectedVentas([])
+        setSelectAll(false)
         fetchVentas()
       } catch (err) {
-        Swal.fire({ title: 'Error', text: err.message, icon: 'error' })
+        Swal.fire('Error', err.message, 'error')
       }
     }
   }
 
-  // Filtrar ventas
   const ventasFiltradas = ventas.filter(v => {
     if (filtro === 'todas') return true
     if (filtro === 'pagadas') return v.estado_pago === 'pagado'
@@ -174,7 +245,6 @@ function SalesHistory() {
 
   const totalVentas = ventasFiltradas.reduce((sum, v) => sum + Number(v.total || 0), 0)
 
-  // Badge de estado de pago
   const getEstadoBadge = (estado) => {
     switch (estado) {
       case 'pagado':
@@ -190,7 +260,7 @@ function SalesHistory() {
 
   return (
     <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm border border-gray-200 max-w-5xl mx-auto">
-      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800"> Historial de Ventas</h2>
+      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">Historial de Ventas</h2>
 
       {/* Controles */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -198,7 +268,7 @@ function SalesHistory() {
           <Filter className="w-5 h-5 text-gray-500" />
           <select
             value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
+            onChange={(e) => { setFiltro(e.target.value); setSelectedVentas([]); setSelectAll(false); }}
             className="border-2 border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="todas">Todas las ventas</option>
@@ -212,36 +282,40 @@ function SalesHistory() {
           <button onClick={exportarVentasCSV} className="btn btn-success flex items-center gap-2">
             <Download className="w-4 h-4" /> Exportar
           </button>
-          <div className="relative">
-            <button
-              onClick={() => {
-                Swal.fire({
-                  title: '¿Cuántos días mantener?',
-                  input: 'select',
-                  inputOptions: {
-                    '7': '7 días',
-                    '30': '30 días',
-                    '90': '90 días',
-                    '180': '180 días',
-                    '365': '1 año'
-                  },
-                  showCancelButton: true,
-                  confirmButtonText: 'Limpiar',
-                  cancelButtonText: 'Cancelar',
-                  confirmButtonColor: '#dc2626'
-                }).then((result) => {
-                  if (result.isConfirmed) {
-                    limpiarHistorial(parseInt(result.value))
-                  }
-                })
-              }}
+          
+          {selectedVentas.length > 0 && (
+            <button 
+              onClick={eliminarSeleccionadas} 
               className="btn btn-danger flex items-center gap-2"
             >
-              <Trash2 className="w-4 h-4" /> Limpiar
+              <Trash2 className="w-4 h-4" /> Eliminar ({selectedVentas.length})
             </button>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Mostrar contador de seleccionadas */}
+      {selectedVentas.length > 0 && (
+        <div className="bg-blue-50 border-2 border-blue-200 p-3 rounded-lg mb-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={toggleSelectAll}
+              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <p className="text-blue-700 font-semibold">
+              {selectedVentas.length} venta(s) seleccionada(s)
+            </p>
+          </div>
+          <button 
+            onClick={() => { setSelectedVentas([]); setSelectAll(false); }}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            Deseleccionar todo
+          </button>
+        </div>
+      )}
 
       {/* Resumen */}
       <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-6">
@@ -258,47 +332,64 @@ function SalesHistory() {
         </div>
       ) : (
         <div className="space-y-4">
-          {ventasFiltradas.map(venta => (
-          <div key={venta.id} className="border-2 border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition">
-            <div className="flex justify-between items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h3 className="text-base sm:text-lg font-bold text-gray-800">Venta #{venta.id}</h3>
-                  {getEstadoBadge(venta.estado_pago || 'pagado')}
-                </div>
-                <p className="text-xs sm:text-sm text-gray-600">
-                  {new Date(venta.fecha).toLocaleString('es-AR')}
-                </p>
-                <p className="text-xs sm:text-sm text-gray-600">
-                  {venta.detalle?.length || 0} producto(s)
-                </p>
-                {venta.cliente_nombre && (
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">
-                    {venta.cliente_nombre}
-                  </p>
-                )}
-              </div>
+          {ventasFiltradas.map(venta => {
+            const isSelected = selectedVentas.includes(venta.id)
+            const canDelete = venta.estado_pago === 'pagado'
+            
+            return (
+              <div key={venta.id} className="border-2 border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* CHECKBOX DE SELECCIÓN */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectVenta(venta.id, venta.estado_pago)}
+                      disabled={!canDelete}
+                      className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed mt-1"
+                      title={!canDelete ? 'Solo ventas pagadas pueden eliminarse' : 'Seleccionar para eliminar'}
+                    />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-800">Venta #{venta.id}</h3>
+                        {getEstadoBadge(venta.estado_pago || 'pagado')}
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-600">
+                        {new Date(venta.fecha).toLocaleString('es-AR')}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-600">
+                        {venta.detalle?.length || 0} producto(s)
+                      </p>
+                      {venta.cliente_nombre && (
+                        <p className="text-xs sm:text-sm text-gray-600 truncate">
+                          {venta.cliente_nombre}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <p className="text-lg sm:text-2xl font-bold text-green-700">${Number(venta.total).toFixed(2)}</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDelete(venta.id)}
-                    className="btn btn-danger text-xs sm:text-sm px-3 py-1.5"
-                  >
-                    Eliminar
-                  </button>
-                  <button
-                    onClick={() => handleShowDetail(venta)}
-                    className="btn btn-primary text-xs sm:text-sm px-3 py-1.5"
-                  >
-                    Detalle
-                  </button>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <p className="text-lg sm:text-2xl font-bold text-green-700">${Number(venta.total).toFixed(2)}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleDelete(venta.id)}
+                        className="btn btn-danger text-xs sm:text-sm px-3 py-1.5"
+                      >
+                        Eliminar
+                      </button>
+                      <button
+                        onClick={() => handleShowDetail(venta)}
+                        className="btn btn-primary text-xs sm:text-sm px-3 py-1.5"
+                      >
+                        Detalle
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            )
+          })}
         </div>
       )}
 
@@ -315,7 +406,7 @@ function SalesHistory() {
             {selectedVenta.cliente_id && (
               <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4">
                 <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
-                  👤 Información del Cliente
+                  <User className="w-5 h-5" /> Información del Cliente
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
@@ -332,7 +423,6 @@ function SalesHistory() {
                   </div>
                 </div>
                 
-                {/* Estado de pago */}
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-sm text-gray-600">Estado:</span>
                   {getEstadoBadge(selectedVenta.estado_pago || 'pagado')}
@@ -351,7 +441,6 @@ function SalesHistory() {
                   </div>
                 )}
                 
-                {/* Botón WhatsApp */}
                 {selectedVenta.cliente_telefono && (
                   <button
                     onClick={() => handleWhatsApp(selectedVenta)}
@@ -365,7 +454,9 @@ function SalesHistory() {
             
             {/* Productos */}
             <div className="space-y-2">
-              <h4 className="font-bold text-gray-700">📦 Productos:</h4>
+              <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                <Package className="w-5 h-5" /> Productos:
+              </h4>
               {selectedVenta.detalle?.map((item, idx) => (
                 <div key={idx} className="border p-4 rounded-lg flex justify-between items-center">
                   <div className="flex-1">
