@@ -22,10 +22,6 @@ const api = axios.create({
 // Cliente Supabase para RPC y operaciones directas
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// 👇 2. DESPUÉS hacemos el debug
-console.log('🔧 SUPABASE_URL:', SUPABASE_URL)
-console.log('🔑 SUPABASE_KEY:', SUPABASE_KEY ? '✅ Existe' : '❌ No existe')
-console.log('🏢 LOCAL_ID:', LOCAL_ID)
 
 // ==========================================
 // PRODUCTOS
