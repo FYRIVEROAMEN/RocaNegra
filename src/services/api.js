@@ -1,8 +1,7 @@
 import axios from 'axios'
 import { createClient } from '@supabase/supabase-js'
 
-console.log('🔧 SUPABASE_URL:', SUPABASE_URL)
-console.log('🔑 SUPABASE_KEY:', SUPABASE_KEY ? '✅ Existe' : '❌ No existe')
+
 
 // 👇 Leemos TODO desde el .env.local (más seguro y prolijo)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
@@ -22,6 +21,11 @@ const api = axios.create({
 
 // Cliente Supabase para RPC y operaciones directas
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// 👇 2. DESPUÉS hacemos el debug
+console.log('🔧 SUPABASE_URL:', SUPABASE_URL)
+console.log('🔑 SUPABASE_KEY:', SUPABASE_KEY ? '✅ Existe' : '❌ No existe')
+console.log('🏢 LOCAL_ID:', LOCAL_ID)
 
 // ==========================================
 // PRODUCTOS
