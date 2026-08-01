@@ -22,7 +22,7 @@ function Login({ onLogin }) {
         <div className="text-center mb-6">
           {/* 👇 Acá cambiamos el ícono por la imagen */}
           <img 
-            src="public/logorocanegra.png" 
+            src="/logorocanegra.png" 
             alt="Logo Roca Negra" 
             className="w-24 h-24 mx-auto mb-3 object-contain"
           />
