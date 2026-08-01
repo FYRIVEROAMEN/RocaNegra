@@ -1,6 +1,9 @@
 import axios from 'axios'
 import { createClient } from '@supabase/supabase-js'
 
+console.log('🔧 SUPABASE_URL:', SUPABASE_URL)
+console.log('🔑 SUPABASE_KEY:', SUPABASE_KEY ? '✅ Existe' : '❌ No existe')
+
 // 👇 Leemos TODO desde el .env.local (más seguro y prolijo)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
