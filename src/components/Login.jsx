@@ -8,7 +8,7 @@ function Login({ onLogin }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (username === 'Ulises' && password === 'Bueno') {
+    if (username === 'Silvia' && password === 'Negocio') {
       onLogin()
       setError('')
     } else {
@@ -23,10 +23,10 @@ function Login({ onLogin }) {
           {/* 👇 Acá cambiamos el ícono por la imagen */}
           <img 
             src="/logorocanegra.png" 
-            alt="Logo Roca Negra" 
+            alt="Logo roca negra" 
             className="w-24 h-24 mx-auto mb-3 object-contain"
           />
-          <h1 className="text-3xl font-bold text-gray-800">Roca Negra</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Stock LOLO</h1>
           <p className="text-gray-500 mt-1">Sistema de gestión de stock</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

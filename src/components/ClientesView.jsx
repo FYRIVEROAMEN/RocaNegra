@@ -509,7 +509,7 @@ function ClientesView() {
                               </div>
                               <div className="text-right">
                                 <p className="text-xs text-gray-600">Total:</p>
-                                <p className="text-lg font-bold text-gray-800">${Number(venta.total).toFixed(2)}</p>
+                                <p className="text-lg font-bold text-gray-800">${Number(venta.total_neto || 0).toFixed(2)}</p>
                               </div>
                             </div>
                             
@@ -568,7 +568,7 @@ function ClientesView() {
                             <div className="p-3 bg-red-50 border-t border-red-200 flex justify-between items-center">
                               <div>
                                 <span className="font-semibold text-red-800">Pendiente:</span>
-                                <p className="text-xs text-red-600 mt-1">Resta pagar de ${Number(venta.total).toFixed(2)}</p>
+                                <p className="text-xs text-red-600 mt-1">Resta pagar de ${Number(venta.total_neto || 0).toFixed(2)}</p>
                               </div>
                               <span className="text-xl font-bold text-red-700">${venta.pendiente.toFixed(2)}</span>
                             </div>

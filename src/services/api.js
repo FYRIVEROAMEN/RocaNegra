@@ -1,8 +1,6 @@
 import axios from 'axios'
 import { createClient } from '@supabase/supabase-js'
 
-
-
 // 👇 Leemos TODO desde el .env.local (más seguro y prolijo)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -21,7 +19,6 @@ const api = axios.create({
 
 // Cliente Supabase para RPC y operaciones directas
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-
 
 // ==========================================
 // PRODUCTOS
