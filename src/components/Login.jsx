@@ -26,7 +26,7 @@ function Login({ onLogin }) {
             alt="Logo roca negra" 
             className="w-24 h-24 mx-auto mb-3 object-contain"
           />
-          <h1 className="text-3xl font-bold text-gray-800">Stock LOLO</h1>
+          <h1 className="text-3xl font-bold text-gray-800">RocaNegra</h1>
           <p className="text-gray-500 mt-1">Sistema de gestión de stock</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
