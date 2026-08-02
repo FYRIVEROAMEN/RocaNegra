@@ -8,7 +8,7 @@ function Login({ onLogin }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (username === 'Silvia' && password === 'Negocio') {
+    if (username === 'Ulises' && password === 'Bueno') {
       onLogin()
       setError('')
     } else {
