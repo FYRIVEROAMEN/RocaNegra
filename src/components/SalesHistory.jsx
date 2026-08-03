@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getVentas, deleteVenta } from '../services/api'
-import { Download, Trash2, Filter, User, Package } from 'lucide-react'
+import { Download, Trash2, Filter, User, Package, Eye } from 'lucide-react' // ✅ Agregué Eye
 import Swal from 'sweetalert2'
 
 // ====================================================================
@@ -44,7 +44,6 @@ function SalesHistory() {
       const ventasAdaptadas = (ventasData || []).map(venta => {
         const pagos = venta.pagos || []
         const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto || 0), 0)
-        // ✅ USAR total_neto (con fallback a total_bruto por si hay datos viejos)
         const totalVenta = Number(venta.total_neto || venta.total_bruto || 0)
         const totalPendiente = totalVenta - totalPagado
         
@@ -99,7 +98,6 @@ function SalesHistory() {
     }
 
     const fecha = new Date(venta.fecha).toLocaleString('es-AR')
-    // ✅ FIX NaN: Usar total_neto
     const montoTotal = Number(venta.total_neto || venta.total_bruto || 0)
     
     let mensaje = `*COMPROBANTE DE VENTA* \n`
@@ -135,7 +133,6 @@ function SalesHistory() {
   const exportarVentasCSV = () => {
     const headers = ['ID Venta', 'Fecha', 'Cliente', 'Teléfono', 'Total Neto', 'Estado Pago', 'Pagado', 'Pendiente']
     const rows = ventasFiltradas.map(v => {
-      // ✅ FIX NaN: Usar total_neto
       const totalNeto = Number(v.total_neto || v.total_bruto || 0)
       return [
         v.id,
@@ -247,7 +244,6 @@ function SalesHistory() {
   })
 
   const totalVentas = ventasFiltradas.reduce((sum, v) => {
-    // ✅ FIX NaN: Usar total_neto
     const monto = Number(v.total_neto || v.total_bruto || 0)
     return sum + monto
   }, 0)
@@ -271,12 +267,12 @@ function SalesHistory() {
 
       {/* Controles */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-500" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-5 h-5 text-gray-500 flex-shrink-0" />
           <select
             value={filtro}
             onChange={(e) => { setFiltro(e.target.value); setSelectedVentas([]); setSelectAll(false); }}
-            className="border-2 border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border-2 border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
           >
             <option value="todas">Todas las ventas</option>
             <option value="pagadas">Pagadas</option>
@@ -285,17 +281,17 @@ function SalesHistory() {
           </select>
         </div>
 
-        <div className="flex gap-2">
-          <button onClick={exportarVentasCSV} className="btn btn-success flex items-center gap-2">
-            <Download className="w-4 h-4" /> Exportar
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button onClick={exportarVentasCSV} className="btn btn-success flex-1 sm:flex-none flex items-center justify-center gap-2">
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span><span className="sm:hidden">Excel</span>
           </button>
           
           {selectedVentas.length > 0 && (
             <button 
               onClick={eliminarSeleccionadas} 
-              className="btn btn-danger flex items-center gap-2"
+              className="btn btn-danger flex-1 sm:flex-none flex items-center justify-center gap-2"
             >
-              <Trash2 className="w-4 h-4" /> Eliminar ({selectedVentas.length})
+              <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Eliminar ({selectedVentas.length})</span><span className="sm:hidden">Borrar ({selectedVentas.length})</span>
             </button>
           )}
         </div>
@@ -303,7 +299,7 @@ function SalesHistory() {
 
       {/* Mostrar contador de seleccionadas */}
       {selectedVentas.length > 0 && (
-        <div className="bg-blue-50 border-2 border-blue-200 p-3 rounded-lg mb-4 flex justify-between items-center">
+        <div className="bg-blue-50 border-2 border-blue-200 p-3 rounded-lg mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -317,7 +313,7 @@ function SalesHistory() {
           </div>
           <button 
             onClick={() => { setSelectedVentas([]); setSelectAll(false); }}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
           >
             Deseleccionar todo
           </button>
@@ -344,15 +340,18 @@ function SalesHistory() {
             const canDelete = venta.estado_pago === 'pagado'
             
             return (
-              <div key={venta.id} className="border-2 border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition">
-                <div className="flex justify-between items-start gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div key={venta.id} className="border-2 border-gray-200 rounded-xl p-3 sm:p-4 hover:shadow-md transition bg-white">
+                {/* ✅ REFATORIZADO PARA MOBILE: Flex column en mobile, row en desktop */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
+                  
+                  {/* Lado Izquierdo: Checkbox + Info */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0 w-full">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleSelectVenta(venta.id, venta.estado_pago)}
                       disabled={!canDelete}
-                      className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed mt-1"
+                      className="w-5 h-5 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
                       title={!canDelete ? 'Solo ventas pagadas pueden eliminarse' : 'Seleccionar para eliminar'}
                     />
                     
@@ -368,33 +367,39 @@ function SalesHistory() {
                         {venta.detalle?.length || 0} producto(s)
                       </p>
                       {venta.cliente_nombre && (
-                        <p className="text-xs sm:text-sm text-gray-600 truncate">
+                        <p className="text-xs sm:text-sm text-gray-600 truncate font-medium">
                           {venta.cliente_nombre}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    {/* ✅ FIX NaN: Usar total_neto */}
-                    <p className="text-lg sm:text-2xl font-bold text-green-700">
+                  {/* Lado Derecho: Precio + Botones (Apilados en mobile, lado a lado en desktop) */}
+                  <div className="flex flex-col sm:items-end gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-3 sm:pt-0">
+                    <p className="text-xl sm:text-2xl font-bold text-green-700 text-right">
                       ${Number(venta.total_neto || venta.total_bruto || 0).toFixed(2)}
                     </p>
-                    <div className="flex gap-2">
+                    
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <button
                         onClick={() => handleDelete(venta.id)}
-                        className="btn btn-danger text-xs sm:text-sm px-3 py-1.5"
+                        className="flex-1 sm:flex-none bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-2.5 sm:py-1.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm border border-red-200"
                       >
-                        Eliminar
+                        <Trash2 className="w-4 h-4 sm:hidden" />
+                        <span className="hidden sm:inline">Eliminar</span>
+                        <span className="sm:hidden">Borrar</span>
                       </button>
                       <button
                         onClick={() => handleShowDetail(venta)}
-                        className="btn btn-primary text-xs sm:text-sm px-3 py-1.5"
+                        className="flex-1 sm:flex-none bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2.5 sm:py-1.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm border border-blue-200"
                       >
-                        Detalle
+                        <Eye className="w-4 h-4 sm:hidden" />
+                        <span className="hidden sm:inline">Detalle</span>
+                        <span className="sm:hidden">Ver</span>
                       </button>
                     </div>
                   </div>
+
                 </div>
               </div>
             )
@@ -407,8 +412,8 @@ function SalesHistory() {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-2xl font-bold">Detalle #{selectedVenta.id}</h3>
-              <button onClick={() => setShowDetail(false)} className="btn btn-secondary">Cerrar</button>
+              <h3 className="text-xl sm:text-2xl font-bold">Detalle #{selectedVenta.id}</h3>
+              <button onClick={() => setShowDetail(false)} className="btn btn-secondary text-sm">Cerrar</button>
             </div>
             
             {selectedVenta.cliente_id && (
@@ -437,7 +442,7 @@ function SalesHistory() {
                 </div>
                 
                 {selectedVenta.estado_pago === 'parcial' && (
-                  <div className="mt-3 flex gap-4 text-sm">
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Pagado:</p>
                       <p className="font-bold text-green-700">${Number(selectedVenta.total_pagado || 0).toFixed(2)}</p>
@@ -465,7 +470,7 @@ function SalesHistory() {
                 <Package className="w-5 h-5" /> Productos:
               </h4>
               {selectedVenta.detalle?.map((item, idx) => (
-                <div key={idx} className="border p-4 rounded-lg flex justify-between items-center">
+                <div key={idx} className="border p-3 sm:p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div className="flex-1">
                     <p className="font-bold">{item.productos?.nombre || 'Eliminado'}</p>
                     <p className="text-sm text-gray-600">
@@ -474,7 +479,7 @@ function SalesHistory() {
                       {item.productos?.color && ` | Color: ${item.productos.color}`}
                     </p>
                   </div>
-                  <p className="font-bold text-lg text-gray-800">
+                  <p className="font-bold text-lg text-gray-800 sm:self-end">
                     ${(item.cantidad * item.precio_unitario).toFixed(2)}
                   </p>
                 </div>
@@ -484,8 +489,7 @@ function SalesHistory() {
             <div className="mt-4 pt-4 border-t-2 border-gray-300">
               <div className="flex justify-between items-center">
                 <span className="text-xl font-bold text-gray-700">Total:</span>
-                {/* ✅ FIX NaN: Usar total_neto en el modal */}
-                <span className="text-3xl font-bold text-green-700">
+                <span className="text-2xl sm:text-3xl font-bold text-green-700">
                   ${Number(selectedVenta.total_neto || selectedVenta.total_bruto || 0).toFixed(2)}
                 </span>
               </div>
