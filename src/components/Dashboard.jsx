@@ -22,6 +22,7 @@ function Dashboard({ onLogout }) {
   const [addedToCart, setAddedToCart] = useState(null)
   const [cart, setCart] = useState([])
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null) // ✅ NUEVO: Para el lightbox
 
   const fetchProductos = useCallback(async () => {
     setLoading(true)
@@ -189,10 +190,15 @@ function Dashboard({ onLogout }) {
             <Package className="w-6 h-6" /> Inventario
           </button>
           <button onClick={() => setCurrentView('sales')} className={`tab-btn ${currentView === 'sales' ? 'active' : ''}`}>
-            <ShoppingCart className="w-6 h-6" /> Registrar Venta
-            {cart.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{cart.length}</span>
-            )}
+            <div className="flex items-center gap-1">
+              <ShoppingCart className="w-6 h-6" />
+              {cart.length > 0 && (
+                <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {cart.length}
+                </span>
+              )}
+            </div>
+            <span className="ml-1">Registrar Venta</span>
           </button>
           <button onClick={() => setCurrentView('history')} className={`tab-btn ${currentView === 'history' ? 'active' : ''}`}>
             <BarChart3 className="w-6 h-6" /> Historial
@@ -446,9 +452,25 @@ function Dashboard({ onLogout }) {
                 ) : (
                   filteredProductos.map((p) => (
                     <div key={p.id} className="product-card">
+                      {/* ✅ IMAGEN CON LIGHTBOX */}
                       {p.imagen_url ? (
-                        <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', background: '#f3f4f6' }}>
-                          <img src={p.imagen_url} alt={p.nombre} style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                        <div 
+                          onClick={() => setSelectedImage(p.imagen_url)}
+                          className="relative cursor-pointer active:scale-95 transition-transform duration-200"
+                          style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', background: '#f3f4f6' }}
+                        >
+                          <img 
+                            src={p.imagen_url} 
+                            alt={p.nombre} 
+                            style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} 
+                            onError={(e) => { e.target.style.display = 'none'; }} 
+                          />
+                          {/* Ícono de lupa sutil */}
+                          <div className="absolute top-2 right-2 bg-black bg-opacity-40 rounded-full p-1.5 opacity-0 hover:opacity-100 transition-opacity">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                            </svg>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', background: '#f3f4f6', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
@@ -504,7 +526,13 @@ function Dashboard({ onLogout }) {
                         <tr key={p.id} className="hover:bg-blue-50 transition">
                           <td className="px-6 py-4">
                             {p.imagen_url ? (
-                              <img src={p.imagen_url} alt={p.nombre} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '8px' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                              <img 
+                                src={p.imagen_url} 
+                                alt={p.nombre} 
+                                style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }} 
+                                onClick={() => setSelectedImage(p.imagen_url)}
+                                onError={(e) => { e.target.style.display = 'none'; }} 
+                              />
                             ) : (
                               <div style={{ width: '50px', height: '50px', background: '#f3f4f6', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Package className="w-6 h-6 text-gray-400" />
@@ -588,7 +616,7 @@ function Dashboard({ onLogout }) {
         ) : currentView === 'clientes' ? (
           <ClientesView />
         ) : currentView === 'metrics' ? (
-      <MetricsView onNavigate={setCurrentView} />
+          <MetricsView onNavigate={setCurrentView} />
         ) : null}
       </main>
 
@@ -597,10 +625,15 @@ function Dashboard({ onLogout }) {
           <Package className="w-6 h-6" /> <span>Inventario</span>
         </button>
         <button onClick={() => { setCurrentView('sales'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'sales' ? 'active' : ''}`}>
-          <ShoppingCart className="w-6 h-6" /> <span>Ventas</span>
-          {cart.length > 0 && (
-            <span className="ml-1 bg-red-500 text-white text-xs px-2 py-1 rounded-full">{cart.length}</span>
-          )}
+          <div className="flex items-center gap-1">
+            <ShoppingCart className="w-6 h-6" />
+            {cart.length > 0 && (
+              <span className="bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {cart.length}
+              </span>
+            )}
+          </div>
+          <span>Ventas</span>
         </button>
         <button onClick={() => { setCurrentView('history'); setShowMoreMenu(false); }} className={`nav-item ${currentView === 'history' ? 'active' : ''}`}>
           <BarChart3 className="w-6 h-6" /> <span>Historial</span>
@@ -647,6 +680,37 @@ function Dashboard({ onLogout }) {
 
       {showForm && <ProductForm onClose={() => setShowForm(false)} editId={editId} onSave={fetchProductos} />}
       {showTutorial && <Tutorial onComplete={() => setShowTutorial(false)} />}
+
+      {/* ️ LIGHTBOX DE IMAGEN - Solo mobile */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-[100] flex items-center justify-center p-4 sm:hidden"
+          onClick={() => setSelectedImage(null)}
+        >
+          {/* Botón cerrar */}
+          <button 
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-2 transition-all z-10"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Imagen centrada con efecto */}
+          <img 
+            src={selectedImage} 
+            alt="Producto" 
+            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Instrucción sutil */}
+          <p className="absolute bottom-8 text-white text-opacity-60 text-sm">
+            Tocá fuera para cerrar
+          </p>
+        </div>
+      )}
     </div>
   )
 }
